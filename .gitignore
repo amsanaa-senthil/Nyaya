@@ -1,31 +1,41 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Virtual environments
-.venv
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
-.env
+# testing
+/coverage
 
-pdfs/
+# next.js
+/.next/
+/out/
 
-# Evaluation files (keep local only)
-evaluation_dataset.json
-evaluation_results.json
-optimization_results.json
-TEST_QUESTIONS.md
+# production
+/build
 
-# Cache files
-.query_cache/
-.bm25_index.pkl
-.index_state.json
+# misc
+.DS_Store
+*.pem
 
-# Development/testing scripts (not needed in production)
-check_metadata.py
-optimize_weights.py
-analyze_optimization.py
-test_prompt.py
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
