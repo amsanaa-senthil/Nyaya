@@ -47,7 +47,7 @@ class VectorRetriever:
         self.collection_name = QDRANT_COLLECTION
         self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-    def search(self, query, top_k=5):
+    def search(self, query, top_k=5, return_metadata=True):
         query_vector = self.model.encode(query).tolist()
 
         results = self.client.query_points(
@@ -57,7 +57,22 @@ class VectorRetriever:
             with_payload=True
         )
 
-        return [clean_text(point.payload.get("text", "")) for point in results.points]
+        if not return_metadata:
+            return [clean_text(point.payload.get("text", "")) for point in results.points]
+
+        enriched = []
+        for point in results.points:
+            payload = point.payload or {}
+            enriched.append({
+                "text": clean_text(payload.get("text", "")),
+                "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
+                "page": payload.get("page"),
+                "section": payload.get("section", "Unknown"),
+                "line_start": payload.get("line_start"),
+                "line_end": payload.get("line_end"),
+            })
+
+        return enriched
 
 
 class AgnoVectorRetriever:
@@ -72,7 +87,7 @@ class AgnoVectorRetriever:
             model="sentence-transformers/all-MiniLM-L6-v2"
         )
     
-    def search(self, query: str, top_k: int = 5) -> list[str]:
+    def search(self, query: str, top_k: int = 5, return_metadata=True) -> list[dict]:
         """Search Qdrant vector database using Agno embedder"""
         query_vector = self.embedder.get_embedding(query)
         
@@ -83,6 +98,21 @@ class AgnoVectorRetriever:
             with_payload=True
         )
         
-        return [clean_text(point.payload.get("text", "")) for point in results.points]
+        if not return_metadata:
+            return [clean_text(point.payload.get("text", "")) for point in results.points]
+
+        enriched = []
+        for point in results.points:
+            payload = point.payload or {}
+            enriched.append({
+                "text": clean_text(payload.get("text", "")),
+                "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
+                "page": payload.get("page"),
+                "section": payload.get("section", "Unknown"),
+                "line_start": payload.get("line_start"),
+                "line_end": payload.get("line_end"),
+            })
+
+        return enriched
 
 
