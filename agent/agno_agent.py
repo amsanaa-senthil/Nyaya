@@ -1,5 +1,6 @@
 import re
 import os
+import time
 from google import genai
 from agent.retriever import VectorRetriever, AgnoVectorRetriever, AGNO_AVAILABLE
 from agent.graph_tool import CitationGraph
@@ -10,6 +11,7 @@ load_dotenv()
 
 # Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 def clean_text(text):
     """
@@ -39,13 +41,20 @@ class NyayaAgent:
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not set in .env file")
         self.client = genai.Client(api_key=GEMINI_API_KEY)
+        self.model_name = GEMINI_MODEL
 
     def ask(self, query):
         query_lower = query.lower()
         
         # Handle citation-specific queries with graph data
         if "most cited" in query_lower or "top cited" in query_lower:
-            top = self.graph.get_most_cited(50)  # Get more to filter duplicates
+            try:
+                start = time.time()
+                top = self.graph.get_most_cited(50)  # Get more to filter duplicates
+                print("Graph query time:", time.time() - start)
+            except Exception as e:
+                print("Graph query failed:", e)
+                top = []
             if top:
                 # Deduplicate and keep only unique cases (show top 20)
                 seen = set()
@@ -67,7 +76,13 @@ class NyayaAgent:
         
         # For specific case citation queries, return clean list
         if ("citations" in query_lower or "cited" in query_lower) and ("v." in query_lower or "vs" in query_lower):
-            cited = self.graph.get_cited_cases(query, 30)
+            try:
+                start = time.time()
+                cited = self.graph.get_cited_cases(query, 30)
+                print("Graph query time:", time.time() - start)
+            except Exception as e:
+                print("Graph query failed:", e)
+                cited = []
             if cited:
                 # Deduplicate similar cases
                 seen = set()
@@ -87,21 +102,44 @@ class NyayaAgent:
                     return result
         
         # For general queries: retrieve context and use LLM
-        context_chunks = self.retriever.search(query, top_k=3)  # Limit to 3 chunks
+        try:
+            start = time.time()
+            context_chunks = self.retriever.search(query, top_k=3, return_metadata=True)
+            print("Retrieval time:", time.time() - start)
+        except Exception as e:
+            print("Vector retrieval failed:", e)
+            context_chunks = []
         
         # Clean and filter chunks
         clean_chunks = []
         for chunk in context_chunks:
-            cleaned = clean_text(chunk)
+            chunk_text = chunk.get("text", "") if isinstance(chunk, dict) else chunk
+            cleaned = clean_text(chunk_text)
             # Skip very short chunks, but allow longer ones for legal content
             if len(cleaned) > 50:
-                clean_chunks.append(cleaned)
+                clean_chunks.append((cleaned, chunk))
         
         if not clean_chunks:
             return "I couldn't find relevant information in the database. Please try rephrasing your question."
         
         # Limit total context to avoid overwhelming the model
-        context_text = "\n\n".join(clean_chunks[:2])  # Max 2 chunks
+        context_blocks = []
+        for cleaned, chunk in clean_chunks[:2]:
+            if isinstance(chunk, dict):
+                pdf = chunk.get("pdf_name") or "Unknown"
+                page = chunk.get("page") or "Unknown"
+                section = chunk.get("section") or "Unknown"
+                line_start = chunk.get("line_start") or "Unknown"
+                line_end = chunk.get("line_end") or "Unknown"
+                context_blocks.append(
+                    "TEXT:\n{0}\n\nSOURCE:\nPDF: {1}\nPage: {2}\nSection: {3}\nLines: {4}-{5}\n-----------------------".format(
+                        cleaned, pdf, page, section, line_start, line_end
+                    )
+                )
+            else:
+                context_blocks.append(cleaned)
+
+        context_text = "\n\n".join(context_blocks)
         
         # Simple, direct prompt
         prompt = f"""{SYSTEM_PROMPT}
@@ -116,9 +154,23 @@ Answer the question based on the context above. Be concise and clear."""
         
         try:
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model=self.model_name,
                 contents=prompt
             )
-            return response.text
+            answer = response.text
+            
+            # Append manual citations if not already present
+            if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer:
+                answer += "\n\n**Sources:**\n"
+                for i, (_, chunk) in enumerate(clean_chunks[:2], 1):
+                    if isinstance(chunk, dict):
+                        pdf = chunk.get("pdf_name", "Unknown")
+                        page = chunk.get("page", "?")
+                        section = chunk.get("section", "Unknown")
+                        line_start = chunk.get("line_start", "?")
+                        line_end = chunk.get("line_end", "?")
+                        answer += f"{i}. (Source: {pdf}, Page {page}, Section: {section}, Lines {line_start}-{line_end})\n"
+            
+            return answer
         except Exception as e:
-            return f"Error generating response: {str(e)}"
+            return f"LLM generation failed: {str(e)}"
