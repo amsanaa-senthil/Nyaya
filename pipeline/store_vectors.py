@@ -39,15 +39,28 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
 
     for chunk, embedding in zip(chunks, embeddings):
         # Convert tensor to list if needed
-        vector = embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+        vector = embedding.tolist() if hasattr(embedding, "tolist") else embedding
+
+        if isinstance(chunk, dict):
+            payload = {
+                "text": chunk.get("text", ""),
+                "pdf_name": chunk.get("pdf_name", pdf_name),
+                "page": chunk.get("page"),
+                "section": chunk.get("section", "Unknown"),
+                "line_start": chunk.get("line_start"),
+                "line_end": chunk.get("line_end"),
+            }
+        else:
+            payload = {
+                "text": chunk,
+                "pdf_name": pdf_name,
+            }
+
         points.append(
             PointStruct(
                 id=str(uuid.uuid4()),
                 vector=vector,
-                payload={
-                    "pdf": pdf_name,
-                    "text": chunk
-                }
+                payload=payload,
             )
         )
 

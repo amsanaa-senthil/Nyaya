@@ -54,3 +54,89 @@ def chunk_text(text, chunk_size=300, overlap=50):
         chunks.append(" ".join(current_chunk))
 
     return chunks
+
+
+def _infer_section(lines, line_index):
+    for i in range(line_index, -1, -1):
+        line = lines[i].strip()
+        if not line:
+            continue
+        if re.match(r"^(section|sec\.|chapter)\b", line, re.IGNORECASE):
+            return line
+        if re.match(r"^\d+(\.\d+)*\s+\S+", line):
+            return line
+        if line.isupper() and len(line.split()) <= 12:
+            return line
+    return "Unknown"
+
+
+def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50):
+    """
+    Chunk per-page text while preserving metadata for citations.
+    Returns list of dicts: text + source metadata.
+    """
+    chunks = []
+
+    for page in pages:
+        page_number = page["page_number"]
+        text = page["text"]
+
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        if not lines:
+            continue
+
+        current_lines = []
+        current_word_count = 0
+
+        for idx, line in enumerate(lines):
+            line_words = line.split()
+            if current_word_count + len(line_words) <= chunk_size:
+                current_lines.append((idx, line))
+                current_word_count += len(line_words)
+            else:
+                if current_lines:
+                    line_start = current_lines[0][0] + 1
+                    line_end = current_lines[-1][0] + 1
+                    section = _infer_section(lines, current_lines[0][0])
+                    chunk_text_value = " ".join([l for _, l in current_lines])
+                    chunks.append({
+                        "text": chunk_text_value,
+                        "pdf_name": pdf_name,
+                        "page": page_number,
+                        "section": section,
+                        "line_start": line_start,
+                        "line_end": line_end,
+                    })
+
+                if overlap > 0 and current_lines:
+                    overlap_words = []
+                    overlap_lines = []
+                    for line_idx, line_value in reversed(current_lines):
+                        overlap_words = line_value.split() + overlap_words
+                        overlap_lines.append((line_idx, line_value))
+                        if len(overlap_words) >= overlap:
+                            break
+                    current_lines = list(reversed(overlap_lines))
+                    current_word_count = len(overlap_words)
+                else:
+                    current_lines = []
+                    current_word_count = 0
+
+                current_lines.append((idx, line))
+                current_word_count += len(line_words)
+
+        if current_lines:
+            line_start = current_lines[0][0] + 1
+            line_end = current_lines[-1][0] + 1
+            section = _infer_section(lines, current_lines[0][0])
+            chunk_text_value = " ".join([l for _, l in current_lines])
+            chunks.append({
+                "text": chunk_text_value,
+                "pdf_name": pdf_name,
+                "page": page_number,
+                "section": section,
+                "line_start": line_start,
+                "line_end": line_end,
+            })
+
+    return chunks

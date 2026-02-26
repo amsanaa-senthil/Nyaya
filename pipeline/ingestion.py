@@ -1,6 +1,6 @@
 import os
-from pipeline.extract_pdf import extract_text_from_pdf
-from pipeline.chunk_pdf import chunk_text
+from pipeline.extract_pdf import extract_text_from_pdf, extract_pages_from_pdf
+from pipeline.chunk_pdf import chunk_text, chunk_pages_with_metadata
 from pipeline.chunker import logical_chunking
 from pipeline.embedder import embed_chunks
 from pipeline.store_vectors import store_in_qdrant
@@ -18,12 +18,14 @@ def process_all_pdfs():
             pdf_path = os.path.join(PDF_FOLDER, file)
             print(f"\nProcessing: {file}")
 
+            pages = extract_pages_from_pdf(pdf_path)
             text = extract_text_from_pdf(pdf_path)
 
-            chunks = chunk_text(text)
+            chunks = chunk_pages_with_metadata(pages, file)
             citation_chunks = logical_chunking(text)
 
-            embeddings = embed_chunks(chunks)
+            chunk_texts = [chunk["text"] for chunk in chunks]
+            embeddings = embed_chunks(chunk_texts)
 
             store_in_qdrant(chunks, embeddings, file)
 
