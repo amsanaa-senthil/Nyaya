@@ -147,16 +147,26 @@ class HybridRetriever:
     def _build_bm25_index(self):
         """Fetch all documents from Qdrant and build BM25 index"""
         try:
+            # Initialize as empty list (not None) to avoid NoneType errors
+            self.documents = []
+            documents = []
+            
             # Get all documents from Qdrant
-            all_docs = self.client.scroll(
-                collection_name=self.collection_name,
-                limit=10000  # Adjust if you have more documents
-            )
+            # For cloud instances, fetching all documents can timeout
+            # In that case, we fallback to vector-only search
+            try:
+                all_docs = self.client.scroll(
+                    collection_name=self.collection_name,
+                    limit=10000  # Adjust if you have more documents
+                )
+            except Exception as scroll_err:
+                print(f"[WARNING] Could not fetch all docs for BM25 (timeout or connection): {type(scroll_err).__name__}")
+                print("[INFO] Switching to vector-only search (BM25 disabled)")
+                self.documents = []
+                self.bm25_model = None
+                return
             
             # Extract text and tokenize for BM25
-            documents = []
-            self.documents = []  # Store for reference
-            
             for point in all_docs[0]:
                 text = point.payload.get("text", "")
                 cleaned = clean_text(text)
@@ -176,11 +186,16 @@ class HybridRetriever:
                 print(f"[OK] Built BM25 index from {len(documents)} documents")
             else:
                 print("[WARNING] No documents found for BM25 indexing")
+                self.documents = []
                 
         except Exception as e:
             print(f"[WARNING] Failed to build BM25 index: {e}")
+            # Ensure documents is an empty list, not None
+            if self.documents is None:
+                self.documents = []
+            self.bm25_model = None
     
-    def search(self, query, top_k=5, return_metadata=True, vector_weight=0.7):
+    def search(self, query, top_k=5, return_metadata=True, vector_weight=0.6):
         """
         Hybrid search combining vector and BM25 scores.
         
@@ -195,12 +210,12 @@ class HybridRetriever:
         """
         bm25_weight = 1.0 - vector_weight
         
-        # Get vector search results
+        # Get vector search results (always available)
         vector_results = self.vector_retriever.search(query, top_k=top_k*2, return_metadata=True)
         
-        # Get BM25 scores
+        # Get BM25 scores (fallback to vector-only if BM25 failed)
         bm25_scores = {}
-        if self.bm25_model and self.documents:
+        if self.bm25_model and self.documents and len(self.documents) > 0:
             try:
                 query_tokens = clean_text(query).lower().split()
                 bm25_ranking = self.bm25_model.get_scores(query_tokens)
@@ -226,37 +241,38 @@ class HybridRetriever:
                 "final_score": vector_score * vector_weight
             }
         
-        # Add BM25 scores for documents
-        for i, doc in enumerate(self.documents):
-            bm25_score = bm25_scores.get(i, 0.0)
-            if bm25_score > 0:
-                doc_id = id(doc)
-                # Normalize BM25 score to 0-1 range
-                max_bm25 = max(bm25_scores.values()) if bm25_scores else 1.0
-                normalized_bm25 = bm25_score / max(max_bm25, 1.0)
-                
-                if doc_id in combined_results:
-                    # Update existing result
-                    combined_results[doc_id]["bm25_score"] = normalized_bm25
-                    combined_results[doc_id]["final_score"] = (
-                        combined_results[doc_id]["vector_score"] * vector_weight +
-                        normalized_bm25 * bm25_weight
-                    )
-                else:
-                    # Add new result from BM25
-                    combined_results[doc_id] = {
-                        "doc": {
-                            "text": doc["text"],
-                            "pdf_name": doc["payload"].get("pdf_name", "Unknown"),
-                            "page": doc["payload"].get("page", "Unknown"),
-                            "section": doc["payload"].get("section", "Unknown"),
-                            "line_start": doc["payload"].get("line_start"),
-                            "line_end": doc["payload"].get("line_end"),
-                        },
-                        "vector_score": 0.0,
-                        "bm25_score": normalized_bm25,
-                        "final_score": normalized_bm25 * bm25_weight
-                    }
+        # Add BM25 scores for documents (only if available)
+        if self.documents and len(self.documents) > 0:
+            for i, doc in enumerate(self.documents):
+                bm25_score = bm25_scores.get(i, 0.0)
+                if bm25_score > 0:
+                    doc_id = id(doc)
+                    # Normalize BM25 score to 0-1 range
+                    max_bm25 = max(bm25_scores.values()) if bm25_scores else 1.0
+                    normalized_bm25 = bm25_score / max(max_bm25, 1.0)
+                    
+                    if doc_id in combined_results:
+                        # Update existing result
+                        combined_results[doc_id]["bm25_score"] = normalized_bm25
+                        combined_results[doc_id]["final_score"] = (
+                            combined_results[doc_id]["vector_score"] * vector_weight +
+                            normalized_bm25 * bm25_weight
+                        )
+                    else:
+                        # Add new result from BM25
+                        combined_results[doc_id] = {
+                            "doc": {
+                                "text": doc["text"],
+                                "pdf_name": doc["payload"].get("pdf_name", "Unknown"),
+                                "page": doc["payload"].get("page", "Unknown"),
+                                "section": doc["payload"].get("section", "Unknown"),
+                                "line_start": doc["payload"].get("line_start"),
+                                "line_end": doc["payload"].get("line_end"),
+                            },
+                            "vector_score": 0.0,
+                            "bm25_score": normalized_bm25,
+                            "final_score": normalized_bm25 * bm25_weight
+                        }
         
         # Sort by final score and return top_k
         sorted_results = sorted(

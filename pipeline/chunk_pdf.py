@@ -78,7 +78,9 @@ def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50):
     chunks = []
 
     for page in pages:
-        page_number = page["page_number"]
+        page_number = page.get("page_number")
+        if page_number is None:
+            page_number = -1
         text = page["text"]
 
         lines = [line.strip() for line in text.split("\n") if line.strip()]

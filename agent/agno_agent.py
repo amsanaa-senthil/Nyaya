@@ -150,7 +150,11 @@ Context from Sri Lankan case law:
 
 Question: {query}
 
-Answer the question based on the context above. Be concise and clear."""
+    Answer the question using ONLY the provided documents.
+    For every factual claim, include a citation in this exact format:
+    (PDF_Name, Page X, Section Y)
+    If no source is found in the provided documents, answer exactly:
+    "Insufficient evidence in retrieved documents."""
         
         try:
             model = genai.GenerativeModel(self.model_name)

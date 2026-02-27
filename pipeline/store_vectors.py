@@ -42,11 +42,19 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
         vector = embedding.tolist() if hasattr(embedding, "tolist") else embedding
 
         if isinstance(chunk, dict):
+            page_value = chunk.get("page")
+            if page_value is None:
+                page_value = -1
+
+            section_value = chunk.get("section")
+            if not section_value:
+                section_value = "Unknown"
+
             payload = {
                 "text": chunk.get("text", ""),
                 "pdf_name": chunk.get("pdf_name", pdf_name),
-                "page": chunk.get("page"),
-                "section": chunk.get("section", "Unknown"),
+                "page": page_value,
+                "section": section_value,
                 "line_start": chunk.get("line_start"),
                 "line_end": chunk.get("line_end"),
             }
@@ -54,6 +62,8 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
             payload = {
                 "text": chunk,
                 "pdf_name": pdf_name,
+                "page": -1,
+                "section": "Unknown",
             }
 
         points.append(
