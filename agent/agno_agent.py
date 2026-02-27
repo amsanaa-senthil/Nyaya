@@ -1,8 +1,8 @@
 import re
 import os
 import time
-from google import genai
-from agent.retriever import VectorRetriever, AgnoVectorRetriever, AGNO_AVAILABLE
+import google.generativeai as genai
+from agent.retriever import VectorRetriever, AgnoVectorRetriever, HybridRetriever, AGNO_AVAILABLE
 from agent.graph_tool import CitationGraph
 from agent.prompts import SYSTEM_PROMPT
 from dotenv import load_dotenv
@@ -34,13 +34,13 @@ class NyayaAgent:
         # Disable Agno for now (package incompatibility)
         self.use_agno = False
         
-        print("✓ Using standard retrieval with Neo4j integration")
-        self.retriever = VectorRetriever()
+        print("[OK] Using hybrid retrieval (vector 70% + BM25 30%) with Neo4j integration")
+        self.retriever = HybridRetriever()
         
         # Initialize Gemini client
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not set in .env file")
-        self.client = genai.Client(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY)
         self.model_name = GEMINI_MODEL
 
     def ask(self, query):
@@ -153,8 +153,8 @@ Question: {query}
 Answer the question based on the context above. Be concise and clear."""
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            model = genai.GenerativeModel(self.model_name)
+            response = model.generate_content(
                 contents=prompt
             )
             answer = response.text
