@@ -30,7 +30,12 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ 
             message: "User created successfully!", 
-            user: res.rows[0] 
+            user: {
+                firstName, 
+                surname, 
+                username, 
+                email 
+            } 
         }, { status: 201 });
 
     } catch (error: any) {

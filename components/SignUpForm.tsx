@@ -2,8 +2,11 @@
 import { User, Mail, Lock, UserCircle } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
 
 export default function SignUpForm() {
+
+  const router = useRouter();
 
   //State object to hold all form data
   const [formData, setFormData] = useState({
@@ -36,9 +39,20 @@ export default function SignUpForm() {
     });
 
     const result = await response.json();
-
     if (response.ok) {
-      alert("Account created for Nyaya!");
+      // 1. Destructure the data you want to pass (from the backend response)
+      const { firstName, surname, username, email } = result.user;
+
+      // 2. Create a query string so the success page can read these details
+      const queryString = new URLSearchParams({
+        firstName,
+        surname,
+        username,
+        email,
+      }).toString();
+
+      // 3. Redirect the user to your new success page
+      router.push(`/signup_success?${queryString}`);
     } else {
       alert(result.error || "Something went wrong");
     }
