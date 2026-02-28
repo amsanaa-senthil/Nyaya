@@ -74,3 +74,25 @@ class CitationGraph:
         with self.driver.session() as session:
             result = session.run(query, title=normalized, limit=limit)
             return [r["case"] for r in result]
+
+    def find_similar_cases(self, case_name, limit=10):
+        normalized = normalize_title(case_name)
+        if not normalized:
+            return []
+
+        tokens = [token for token in normalized.split() if len(token) > 2]
+        if not tokens:
+            return []
+
+        token = tokens[0]
+        query = """
+        MATCH (c:Case)
+        WHERE toLower(c.title) CONTAINS $token
+        RETURN c.title AS case
+        ORDER BY c.title
+        LIMIT $limit
+        """
+
+        with self.driver.session() as session:
+            result = session.run(query, token=token, limit=limit)
+            return [r["case"] for r in result]

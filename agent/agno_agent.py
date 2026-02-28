@@ -1,11 +1,21 @@
 import re
 import os
 import time
-import google.generativeai as genai
+import warnings
 from agent.retriever import VectorRetriever, AgnoVectorRetriever, HybridRetriever, AGNO_AVAILABLE
 from agent.graph_tool import CitationGraph
 from agent.prompts import SYSTEM_PROMPT
 from dotenv import load_dotenv
+
+try:
+    from google import genai as new_genai
+    USE_NEW_GENAI = True
+except ImportError:
+    new_genai = None
+    USE_NEW_GENAI = False
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        import google.generativeai as legacy_genai
 
 load_dotenv()
 
@@ -34,17 +44,90 @@ class NyayaAgent:
         # Disable Agno for now (package incompatibility)
         self.use_agno = False
         
-        print("[OK] Using hybrid retrieval (vector 70% + BM25 30%) with Neo4j integration")
+        print("[OK] Using hybrid retrieval (vector 60% + BM25 40%) with Neo4j integration")
         self.retriever = HybridRetriever()
         
         # Initialize Gemini client
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not set in .env file")
-        genai.configure(api_key=GEMINI_API_KEY)
         self.model_name = GEMINI_MODEL
+        if USE_NEW_GENAI:
+            self.llm_client = new_genai.Client(api_key=GEMINI_API_KEY)
+        else:
+            legacy_genai.configure(api_key=GEMINI_API_KEY)
+            self.llm_client = None
+
+    def _build_retrieval_fallback_answer(self, query, clean_chunks):
+        lines = [
+            "Insufficient evidence in retrieved documents." if not clean_chunks else "Based on retrieved documents, here is the best available context:"
+        ]
+
+        for i, (cleaned, chunk) in enumerate(clean_chunks[:2], 1):
+            if isinstance(chunk, dict):
+                pdf = chunk.get("pdf_name") or "Unknown"
+                page = chunk.get("page") if chunk.get("page") is not None else -1
+                section = chunk.get("section") or "Unknown"
+                excerpt = cleaned[:280].strip()
+                lines.append(f"{i}. {excerpt} ({pdf}, Page {page}, Section {section})")
+
+        return "\n".join(lines)
 
     def ask(self, query):
         query_lower = query.lower()
+        
+        # ENHANCED: Detect specific case queries (e.g., "Bulankulama v. Secretary")
+        # Pattern: "word v. word" or "word vs word" or "word vs. word"
+        import re
+        case_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:v\.|vs\.?|versus)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*'
+        case_match = re.search(case_pattern, query)
+        
+        if case_match:
+            case_name = case_match.group(0)
+            print(f"[ROUTER] Detected case query: {case_name}")
+            
+            # Get citation network from graph
+            try:
+                # Get cases this case cites
+                cites = self.graph.get_cited_cases(case_name, limit=10)
+                
+                # Get cases that cite this case (DISTINCTION LEVEL)
+                cited_by = self.graph.get_cited_by(case_name, limit=10)
+                
+                # Get citation count
+                case_info = self.graph.get_case_info(case_name)
+                
+                if cited_by or cites or case_info:
+                    result = f"**Citation Analysis: {case_name}**\n\n"
+                    
+                    if case_info:
+                        citation_count = case_info.get("citation_count", 0)
+                        result += f"This case has been cited {citation_count} times.\n\n"
+                    
+                    if cited_by:
+                        result += f"**Cases that cite {case_name}:**\n"
+                        for i, case in enumerate(cited_by, 1):
+                            result += f"{i}. {case}\n"
+                        result += "\n"
+                    
+                    if cites:
+                        result += f"**Cases cited by {case_name}:**\n"
+                        for i, case in enumerate(cites, 1):
+                            result += f"{i}. {case}\n"
+                    
+                    return result
+                else:
+                    print(f"[INFO] No citation data found for '{case_name}', checking similar case titles")
+                    similar_cases = self.graph.find_similar_cases(case_name, limit=10)
+                    if similar_cases:
+                        result = f"**No exact citation network found for: {case_name}**\n\n"
+                        result += "**Similar case titles in graph:**\n"
+                        for i, case in enumerate(similar_cases, 1):
+                            result += f"{i}. {case}\n"
+                        result += "\nTry one of the above exact titles for network analysis."
+                        return result
+                    print(f"[INFO] No similar graph cases found for '{case_name}', falling back to retrieval")
+            except Exception as e:
+                print(f"[WARNING] Graph query failed for case '{case_name}': {e}")
         
         # Handle citation-specific queries with graph data
         if "most cited" in query_lower or "top cited" in query_lower:
@@ -141,7 +224,7 @@ class NyayaAgent:
 
         context_text = "\n\n".join(context_blocks)
         
-        # Simple, direct prompt
+        # Strict citation prompt
         prompt = f"""{SYSTEM_PROMPT}
 
 Context from Sri Lankan case law:
@@ -150,18 +233,25 @@ Context from Sri Lankan case law:
 
 Question: {query}
 
-    Answer the question using ONLY the provided documents.
-    For every factual claim, include a citation in this exact format:
-    (PDF_Name, Page X, Section Y)
-    If no source is found in the provided documents, answer exactly:
-    "Insufficient evidence in retrieved documents."""
+Answer the question using ONLY the provided documents.
+Rules:
+1. Every factual statement MUST include a citation in this format:
+   (PDF_Name, Page X, Section Y)
+2. If information is not present in the documents, say:
+   "Insufficient evidence in retrieved documents."
+3. Do NOT generate information outside the provided context."""
         
         try:
-            model = genai.GenerativeModel(self.model_name)
-            response = model.generate_content(
-                contents=prompt
-            )
-            answer = response.text
+            if USE_NEW_GENAI:
+                response = self.llm_client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                )
+                answer = response.text
+            else:
+                model = legacy_genai.GenerativeModel(self.model_name)
+                response = model.generate_content(contents=prompt)
+                answer = response.text
             
             # Append manual citations if not already present
             if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer:
@@ -177,4 +267,5 @@ Question: {query}
             
             return answer
         except Exception as e:
-            return f"LLM generation failed: {str(e)}"
+            print(f"[WARNING] LLM generation failed: {e}")
+            return self._build_retrieval_fallback_answer(query, clean_chunks)
