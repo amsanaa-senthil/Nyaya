@@ -29,15 +29,22 @@ def process_all_pdfs():
 
             store_in_qdrant(chunks, embeddings, file)
 
-            # Pass text for metadata extraction
-            create_case_node(file, text=text)
-
-            create_citation_relationships(text, file, chunks=citation_chunks)
+            # Pass text for metadata extraction (Neo4j - optional)
+            try:
+                create_case_node(file, text=text)
+                create_citation_relationships(text, file, chunks=citation_chunks)
+            except Exception as e:
+                print(f"[WARNING] Neo4j graph update failed for {file}: {e}")
+                print("[INFO] Continuing with vector store indexing...")
 
     print("\nAll PDFs processed successfully.")
     
-    # Auto-deduplicate and merge OCR variants in Neo4j
-    print("\n" + "="*60)
-    print("Starting automatic deduplication of case nodes...")
-    print("="*60)
-    consolidate_duplicate_cases(similarity_threshold=0.85)
+    # Auto-deduplicate and merge OCR variants in Neo4j (optional)
+    try:
+        print("\n" + "="*60)
+        print("Starting automatic deduplication of case nodes...")
+        print("="*60)
+        consolidate_duplicate_cases(similarity_threshold=0.85)
+    except Exception as e:
+        print(f"[WARNING] Neo4j deduplication failed: {e}")
+        print("[INFO] Vector store is ready for queries.")
