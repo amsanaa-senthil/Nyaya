@@ -5,6 +5,7 @@ import warnings
 from agent.retriever import VectorRetriever, AgnoVectorRetriever, HybridRetriever, AGNO_AVAILABLE
 from agent.graph_tool import CitationGraph
 from agent.prompts import SYSTEM_PROMPT
+from optimizations import score_result_relevance, extract_query_terms
 from dotenv import load_dotenv
 
 try:
@@ -37,14 +38,16 @@ def clean_text(text):
 
 
 class NyayaAgent:
-    def __init__(self, use_agno=False):
+    def __init__(self, use_agno=False, show_debug=False):
         # Initialize graph and retriever
         self.graph = CitationGraph()
+        self.show_debug = show_debug  # Suppress debug output for end users
         
         # Disable Agno for now (package incompatibility)
         self.use_agno = False
         
-        print("[OK] Using hybrid retrieval (vector 60% + BM25 40%) with Neo4j integration")
+        if self.show_debug:
+            print("[OK] Using hybrid retrieval (vector 60% + BM25 40%) with Neo4j integration")
         self.retriever = HybridRetriever()
         
         # Initialize Gemini client
@@ -58,17 +61,84 @@ class NyayaAgent:
             self.llm_client = None
 
     def _build_retrieval_fallback_answer(self, query, clean_chunks):
-        lines = [
-            "Insufficient evidence in retrieved documents." if not clean_chunks else "Based on retrieved documents, here is the best available context:"
-        ]
+        if not clean_chunks:
+            return "Sorry, I couldn't find enough relevant information for that question in the current database."
 
-        for i, (cleaned, chunk) in enumerate(clean_chunks[:2], 1):
-            if isinstance(chunk, dict):
-                pdf = chunk.get("pdf_name") or "Unknown"
-                page = chunk.get("page") if chunk.get("page") is not None else -1
-                section = chunk.get("section") or "Unknown"
-                excerpt = cleaned[:280].strip()
-                lines.append(f"{i}. {excerpt} ({pdf}, Page {page}, Section {section})")
+        # Confidence gate: avoid hallucination/noisy dump
+        first_cleaned, first_chunk = clean_chunks[0]
+        first_dict = first_chunk if isinstance(first_chunk, dict) else {"text": first_cleaned}
+        best_score = score_result_relevance(first_dict, query)
+
+        query_terms = extract_query_terms(query)
+        matched_query_terms = sum(1 for term in query_terms if term in first_cleaned.lower())
+
+        if best_score < 0.10 or (len(query_terms) >= 3 and matched_query_terms == 0):
+            return "Sorry, I couldn't find reliable information for that question in the current database."
+
+        seen = set()
+        unique = []
+        for cleaned, chunk in clean_chunks:
+            snippet_key = cleaned[:160].lower()
+            if snippet_key in seen:
+                continue
+            seen.add(snippet_key)
+            unique.append((cleaned, chunk))
+            if len(unique) >= 2:
+                break
+
+        if not unique:
+            return "Sorry, I couldn't find enough relevant information for that question in the current database."
+
+        best_text, best_chunk = unique[0]
+        best_excerpt = best_text[:350].strip()
+
+        lines = ["Direct answer:", best_excerpt, "", "Sources:"]
+
+        for i, (_, chunk) in enumerate(unique, 1):
+            if not isinstance(chunk, dict):
+                continue
+            pdf = chunk.get("pdf_name") or "Unknown"
+            page = chunk.get("page") if chunk.get("page") is not None else "?"
+            lines.append(f"{i}. {pdf}, page {page}")
+
+        lines.append("")
+        lines.append("Note: This response is retrieval-only because the LLM is currently unavailable.")
+        return "\n".join(lines)
+
+    def _build_case_source_block(self, case_name, top_k=2):
+        lines = ["\n\n**Source Citations:**"]
+        try:
+            chunks = self.retriever.search(case_name, top_k=top_k, return_metadata=True)
+        except Exception as e:
+            lines.append(f"- Could not fetch supporting sources: {e}")
+            return "\n".join(lines)
+
+        added = 0
+        for chunk in chunks:
+            if not isinstance(chunk, dict):
+                continue
+
+            text = clean_text(chunk.get("text", ""))
+            if len(text) < 40:
+                continue
+
+            pdf = chunk.get("pdf_name") or "Unknown"
+            page = chunk.get("page") if chunk.get("page") is not None else -1
+            section = chunk.get("section") or "Unknown"
+            quote = text[:260].strip().replace('"', "'")
+
+            lines.append(f"{added + 1}. Case: {case_name}")
+            lines.append(f"   PDF/File: {pdf}")
+            lines.append(f"   Page: {page}")
+            lines.append(f"   Section: {section}")
+            lines.append(f"   Citation: \"{quote}\"")
+            added += 1
+
+            if added >= top_k:
+                break
+
+        if added == 0:
+            lines.append("- No supporting quoted citation found in retrieved chunks.")
 
         return "\n".join(lines)
 
@@ -83,7 +153,8 @@ class NyayaAgent:
         
         if case_match:
             case_name = case_match.group(0)
-            print(f"[ROUTER] Detected case query: {case_name}")
+            if self.show_debug:
+                print(f"[ROUTER] Detected case query: {case_name}")
             
             # Get citation network from graph
             try:
@@ -113,10 +184,12 @@ class NyayaAgent:
                         result += f"**Cases cited by {case_name}:**\n"
                         for i, case in enumerate(cites, 1):
                             result += f"{i}. {case}\n"
-                    
+
+                    result += self._build_case_source_block(case_name)
                     return result
                 else:
-                    print(f"[INFO] No citation data found for '{case_name}', checking similar case titles")
+                    if self.show_debug:
+                        print(f"[INFO] No citation data found for '{case_name}', checking similar case titles")
                     similar_cases = self.graph.find_similar_cases(case_name, limit=10)
                     if similar_cases:
                         result = f"**No exact citation network found for: {case_name}**\n\n"
@@ -124,19 +197,24 @@ class NyayaAgent:
                         for i, case in enumerate(similar_cases, 1):
                             result += f"{i}. {case}\n"
                         result += "\nTry one of the above exact titles for network analysis."
+                        result += self._build_case_source_block(case_name)
                         return result
-                    print(f"[INFO] No similar graph cases found for '{case_name}', falling back to retrieval")
+                    if self.show_debug:
+                        print(f"[INFO] No similar graph cases found for '{case_name}', falling back to retrieval")
             except Exception as e:
-                print(f"[WARNING] Graph query failed for case '{case_name}': {e}")
+                if self.show_debug:
+                    print(f"[WARNING] Graph query failed for case '{case_name}': {e}")
         
         # Handle citation-specific queries with graph data
         if "most cited" in query_lower or "top cited" in query_lower:
             try:
                 start = time.time()
                 top = self.graph.get_most_cited(50)  # Get more to filter duplicates
-                print("Graph query time:", time.time() - start)
+                if self.show_debug:
+                    print("Graph query time:", time.time() - start)
             except Exception as e:
-                print("Graph query failed:", e)
+                if self.show_debug:
+                    print("Graph query failed:", e)
                 top = []
             if top:
                 # Deduplicate and keep only unique cases (show top 20)
@@ -162,9 +240,11 @@ class NyayaAgent:
             try:
                 start = time.time()
                 cited = self.graph.get_cited_cases(query, 30)
-                print("Graph query time:", time.time() - start)
+                if self.show_debug:
+                    print("Graph query time:", time.time() - start)
             except Exception as e:
-                print("Graph query failed:", e)
+                if self.show_debug:
+                    print("Graph query failed:", e)
                 cited = []
             if cited:
                 # Deduplicate similar cases
@@ -182,15 +262,18 @@ class NyayaAgent:
                     result = f"**Cases cited in {query}:**\n\n"
                     for i, case in enumerate(unique_cited, 1):
                         result += f"{i}. {case.title()}\n"
+                    result += self._build_case_source_block(query)
                     return result
         
         # For general queries: retrieve context and use LLM
         try:
             start = time.time()
             context_chunks = self.retriever.search(query, top_k=3, return_metadata=True)
-            print("Retrieval time:", time.time() - start)
+            if self.show_debug:
+                print("Retrieval time:", time.time() - start)
         except Exception as e:
-            print("Vector retrieval failed:", e)
+            if self.show_debug:
+                print("Vector retrieval failed:", e)
             context_chunks = []
         
         # Clean and filter chunks
@@ -203,7 +286,7 @@ class NyayaAgent:
                 clean_chunks.append((cleaned, chunk))
         
         if not clean_chunks:
-            return "I couldn't find relevant information in the database. Please try rephrasing your question."
+            return "I couldn't find relevant information in the database for your query. Please try rephrasing your question or ask about a different legal topic."
         
         # Limit total context to avoid overwhelming the model
         context_blocks = []
@@ -224,22 +307,19 @@ class NyayaAgent:
 
         context_text = "\n\n".join(context_blocks)
         
-        # Strict citation prompt
-        prompt = f"""{SYSTEM_PROMPT}
+        # Build prompt for LLM - simple and clean
+        prompt = f"""You are a helpful legal assistant for Sri Lankan law. Answer the question clearly and concisely based on the provided legal documents.
 
 Context from Sri Lankan case law:
-
 {context_text}
 
 Question: {query}
 
-Answer the question using ONLY the provided documents.
-Rules:
-1. Every factual statement MUST include a citation in this format:
-   (PDF_Name, Page X, Section Y)
-2. If information is not present in the documents, say:
-   "Insufficient evidence in retrieved documents."
-3. Do NOT generate information outside the provided context."""
+Instructions:
+- Answer clearly and simply
+- Base your answer ONLY on the provided documents
+- If you're unsure, say "I don't have enough information to answer this"
+- Keep your answer concise"""
         
         try:
             if USE_NEW_GENAI:
@@ -267,5 +347,6 @@ Rules:
             
             return answer
         except Exception as e:
-            print(f"[WARNING] LLM generation failed: {e}")
+            if self.show_debug:
+                print(f"[DEBUG] LLM generation failed, using retrieval fallback: {e}")
             return self._build_retrieval_fallback_answer(query, clean_chunks)
