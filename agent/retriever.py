@@ -7,6 +7,14 @@ load_dotenv()
 import re
 from rank_bm25 import BM25Okapi
 import numpy as np
+from optimizations import (
+    get_cached_query_result,
+    cache_query_result,
+    filter_results_by_threshold,
+    score_result_relevance,
+    extract_query_terms,
+    OPTIMIZED_SETTINGS,
+)
 
 try:
     from agno.knowledge.vector_db import VectorDB
@@ -210,6 +218,15 @@ class HybridRetriever:
         """
         bm25_weight = 1.0 - vector_weight
         
+        # Check cache first (skip if exact match found)
+        if OPTIMIZED_SETTINGS.get("cache_enabled"):
+            cached = get_cached_query_result(query)
+            if cached:
+                # Debug: print(f"[CACHE HIT] Retrieved cached results for query")
+                if return_metadata:
+                    return cached[:top_k]
+                return [r.get("text", "") for r in cached[:top_k]]
+        
         # Get vector search results (always available)
         vector_results = self.vector_retriever.search(query, top_k=top_k*2, return_metadata=True)
         
@@ -217,14 +234,16 @@ class HybridRetriever:
         bm25_scores = {}
         if self.bm25_model and self.documents and len(self.documents) > 0:
             try:
-                query_tokens = clean_text(query).lower().split()
+                query_tokens = extract_query_terms(query)
+                if not query_tokens:
+                    query_tokens = clean_text(query).lower().split()
                 bm25_ranking = self.bm25_model.get_scores(query_tokens)
                 
                 # Create mapping of doc_id to BM25 score
                 for i, score in enumerate(bm25_ranking):
                     bm25_scores[i] = score
             except Exception as e:
-                print(f"[WARNING] BM25 scoring failed: {e}")
+                pass
         
         # Combine and rank results
         combined_results = {}
@@ -279,11 +298,23 @@ class HybridRetriever:
             combined_results.values(),
             key=lambda x: x["final_score"],
             reverse=True
+        )
+        
+        # Apply relevance filtering (accuracy improvement)
+        docs_for_filtering = [r["doc"] for r in sorted_results]
+        filtered_results = filter_results_by_threshold(
+            docs_for_filtering,
+            query,
+            threshold=OPTIMIZED_SETTINGS.get("result_threshold", 0.32)
         )[:top_k]
         
+        # Cache results for future queries
+        if OPTIMIZED_SETTINGS.get("cache_enabled"):
+            cache_query_result(query, filtered_results)
+        
         if return_metadata:
-            return [result["doc"] for result in sorted_results]
+            return filtered_results
         else:
-            return [clean_text(result["doc"].get("text", "")) for result in sorted_results]
+            return [clean_text(r.get("text", "")) for r in filtered_results]
 
 
