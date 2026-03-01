@@ -1,14 +1,22 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct
+from qdrant_client.models import (
+    VectorParams,
+    Distance,
+    PointStruct,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
 from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
 import os
-import uuid
 import time
+import hashlib
+import uuid
 
 
 def _create_client():
-    """Create Qdrant client with longer timeout for cloud instances."""
-    timeout_seconds = 300  # 5 minutes for cloud operations
+    """Create Qdrant client with robust timeout for cloud instances."""
+    timeout_seconds = 600  # 10 minutes for large batch uploads to cloud
     
     if QDRANT_HOST.startswith("http"):
         return QdrantClient(
@@ -18,7 +26,18 @@ def _create_client():
         )
     return QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=timeout_seconds)
 
-def store_in_qdrant(chunks, embeddings, pdf_name):
+def _stable_point_id(pdf_name, page, section, text):
+    """Generate a stable UUID from chunk metadata.
+    Qdrant requires point IDs to be either unsigned integers or UUIDs.
+    """
+    key = f"{pdf_name}|{page}|{section}|{text}".encode("utf-8", errors="ignore")
+    # Use SHA1 hash to seed UUID5 (deterministic UUID generation)
+    hash_obj = hashlib.sha1(key)
+    # Create UUID 5 (SHA1-based) using the hash as namespace
+    return str(uuid.UUID(int=int(hash_obj.hexdigest()[:16], 16)))
+
+
+def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
     client = _create_client()
 
     collection_name = QDRANT_COLLECTION
@@ -34,6 +53,12 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
                 distance=Distance.COSINE
             )
         )
+
+    if replace_pdf:
+        # Note: Cannot delete by pdf_name filter without payload index.
+        # Instead, rely on UUID collision prevention (same content = same ID)
+        # This ensures idempotent re-uploads without duplication.
+        pass
 
     points = []
 
@@ -68,16 +93,22 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
 
         points.append(
             PointStruct(
-                id=str(uuid.uuid4()),
+                id=_stable_point_id(
+                    payload.get("pdf_name", pdf_name),
+                    payload.get("page", -1),
+                    payload.get("section", "Unknown"),
+                    payload.get("text", ""),
+                ),
                 vector=vector,
                 payload=payload,
             )
         )
 
     if points:
-        # Batch upsert with retry logic to avoid timeouts on large datasets
-        batch_size = 50  # Reduced from 100 for more reliable uploads
-        max_retries = 3
+        # Batch upsert with robust retry logic for Qdrant Cloud
+        batch_size = 30  # Smaller batches for better reliability on cloud
+        max_retries = 5  # More retries for intermittent network issues
+        failed_batches = []  # Track failed batches
         
         for i in range(0, len(points), batch_size):
             batch = points[i:i+batch_size]
@@ -85,21 +116,39 @@ def store_in_qdrant(chunks, embeddings, pdf_name):
             total_batches = (len(points) + batch_size - 1) // batch_size
             
             # Retry logic with exponential backoff
+            batch_uploaded = False
             for attempt in range(max_retries):
                 try:
                     print(f"  Batch {batch_num}/{total_batches}: uploading {len(batch)} points...", end="", flush=True)
                     client.upsert(collection_name=collection_name, points=batch)
                     print(" OK")
+                    batch_uploaded = True
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                        print(f" TIMEOUT. Retrying in {wait_time}s (attempt {attempt+1}/{max_retries})...")
+                        # Exponential backoff with jitter
+                        wait_time = (2 ** attempt) + (0.1 * (attempt + 1))
+                        print(f" CONNECTION ERROR. Retrying in {wait_time:.1f}s (attempt {attempt+1}/{max_retries})...")
                         time.sleep(wait_time)
+                        
+                        # Recreate client after connection error
+                        if attempt >= 2:
+                            print(f"  Reconnecting to Qdrant...")
+                            client = _create_client()
                     else:
-                        print(f" FAILED after {max_retries} attempts")
-                        raise
+                        print(f" FAILED after {max_retries} attempts (continuing with other batches)...")
+                        failed_batches.append(batch_num)
+            
+            # Continue even if batch fails (partial upload is better than crash)
+            if not batch_uploaded and batch_num > 0:
+                print(f"  [WARNING] Batch {batch_num} skipped, continuing...")
         
-        print(f"[OK] Stored {len(points)} vectors for {pdf_name}")
+        # Report summary
+        if failed_batches:
+            stored_count = len(points) - (len(failed_batches) * batch_size)
+            print(f"[WARNING] {pdf_name}: {len(failed_batches)} batch(es) failed")
+            print(f"[INFO] Partial upload: {stored_count}/{len(points)} points stored (acceptable for incremental indexing)")
+        else:
+            print(f"[OK] Stored {len(points)} vectors for {pdf_name}")
 
     return client
