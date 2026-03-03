@@ -1,15 +1,24 @@
 # agent/llm.py
 
-import os
-from google import genai
-from config import GEMINI_API_KEY
+from openai import AzureOpenAI
+from config import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_API_VERSION
+)
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = AzureOpenAI(
+    api_key=AZURE_OPENAI_API_KEY,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_version=AZURE_OPENAI_API_VERSION
+)
 
 def generate_answer(prompt):
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT,
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
     )
-    return response.text
+    return response.choices[0].message.content
