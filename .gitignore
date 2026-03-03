@@ -13,3 +13,12 @@ wheels/
 
 pdfs/
 
+# Fine-tuning artifacts
+finetune/data/
+finetune/output/
+
+# Evaluation files (keep local only)
+evaluation_dataset.json
+TEST_QUESTIONS.md
+
+.query_cache/
