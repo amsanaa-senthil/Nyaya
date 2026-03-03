@@ -6,12 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 import re
 from rank_bm25 import BM25Okapi
-import numpy as np
 from optimizations import (
     get_cached_query_result,
     cache_query_result,
     filter_results_by_threshold,
-    score_result_relevance,
     extract_query_terms,
     OPTIMIZED_SETTINGS,
 )

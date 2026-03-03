@@ -1,7 +1,7 @@
 import os
 import json
 from pipeline.extract_pdf import extract_text_from_pdf, extract_pages_from_pdf
-from pipeline.chunk_pdf import chunk_text, chunk_pages_with_metadata
+from pipeline.chunk_pdf import chunk_pages_with_metadata
 from pipeline.chunker import logical_chunking
 from pipeline.embedder import embed_chunks
 from pipeline.store_vectors import store_in_qdrant

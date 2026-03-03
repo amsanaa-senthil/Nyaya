@@ -1,28 +1,12 @@
 import re
-import os
 import time
-import warnings
-from agent.retriever import VectorRetriever, AgnoVectorRetriever, HybridRetriever, AGNO_AVAILABLE
+from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
-from agent.prompts import SYSTEM_PROMPT
 from optimizations import score_result_relevance, extract_query_terms
+from agent.llm import generate_answer
 from dotenv import load_dotenv
 
-try:
-    from google import genai as new_genai
-    USE_NEW_GENAI = True
-except ImportError:
-    new_genai = None
-    USE_NEW_GENAI = False
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        import google.generativeai as legacy_genai
-
 load_dotenv()
-
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 def clean_text(text):
     """
@@ -50,15 +34,22 @@ class NyayaAgent:
             print("[OK] Using hybrid retrieval (vector 60% + BM25 40%) with Neo4j integration")
         self.retriever = HybridRetriever()
         
-        # Initialize Gemini client
-        if not GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY not set in .env file")
-        self.model_name = GEMINI_MODEL
-        if USE_NEW_GENAI:
-            self.llm_client = new_genai.Client(api_key=GEMINI_API_KEY)
-        else:
-            legacy_genai.configure(api_key=GEMINI_API_KEY)
-            self.llm_client = None
+        # Azure OpenAI is configured in llm.py
+        self.last_llm_error = None
+
+    def _generate_with_llm(self, prompt: str) -> str:
+        """Generate answer using Azure OpenAI (configured in llm.py)"""
+        try:
+            self.last_llm_error = None
+            answer = generate_answer(prompt)
+            if answer and answer.strip():
+                return answer
+            raise RuntimeError("LLM returned an empty response")
+        except Exception as error:
+            self.last_llm_error = f"{type(error).__name__}: {error}"
+            if self.show_debug:
+                print(f"[DEBUG] LLM generation failed: {type(error).__name__}: {error}")
+            raise
 
     def _build_retrieval_fallback_answer(self, query, clean_chunks):
         if not clean_chunks:
@@ -102,7 +93,11 @@ class NyayaAgent:
             lines.append(f"{i}. {pdf}, page {page}")
 
         lines.append("")
-        lines.append("Note: This response is retrieval-only because the LLM is currently unavailable.")
+        error_text = (self.last_llm_error or "").lower()
+        if any(marker in error_text for marker in ["resource_exhausted", "quota", "429", "api"]):
+            lines.append("Note: This response is retrieval-only because the Azure OpenAI API is currently unavailable.")
+        else:
+            lines.append("Note: This response is retrieval-only because the LLM is currently unavailable.")
         return "\n".join(lines)
 
     def _build_case_source_block(self, case_name, top_k=2):
@@ -144,6 +139,11 @@ class NyayaAgent:
 
     def ask(self, query):
         query_lower = query.lower()
+
+        # Guardrail: avoid wasting LLM calls on vague/low-information inputs
+        query_terms = extract_query_terms(query)
+        if len(query_terms) < 2 and len(query.split()) < 2:
+            return "Please ask a more specific legal question (e.g., 'difference between civil and criminal burden of proof')."
         
         # ENHANCED: Detect specific case queries (e.g., "Bulankulama v. Secretary")
         # Pattern: "word v. word" or "word vs word" or "word vs. word"
@@ -306,6 +306,7 @@ class NyayaAgent:
                 context_blocks.append(cleaned)
 
         context_text = "\n\n".join(context_blocks)
+        self.last_llm_error = None
         
         # Build prompt for LLM - simple and clean
         prompt = f"""You are a helpful legal assistant for Sri Lankan law. Answer the question clearly and concisely based on the provided legal documents.
@@ -322,16 +323,7 @@ Instructions:
 - Keep your answer concise"""
         
         try:
-            if USE_NEW_GENAI:
-                response = self.llm_client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                )
-                answer = response.text
-            else:
-                model = legacy_genai.GenerativeModel(self.model_name)
-                response = model.generate_content(contents=prompt)
-                answer = response.text
+            answer = self._generate_with_llm(prompt)
             
             # Append manual citations if not already present
             if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer:

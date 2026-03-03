@@ -3,9 +3,6 @@ from qdrant_client.models import (
     VectorParams,
     Distance,
     PointStruct,
-    Filter,
-    FieldCondition,
-    MatchValue,
 )
 from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
 import os
