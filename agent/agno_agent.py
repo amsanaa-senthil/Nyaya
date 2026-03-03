@@ -308,8 +308,8 @@ class NyayaAgent:
         context_text = "\n\n".join(context_blocks)
         self.last_llm_error = None
         
-        # Build prompt for LLM - simple and clean
-        prompt = f"""You are a helpful legal assistant for Sri Lankan law. Answer the question clearly and concisely based on the provided legal documents.
+        # Build prompt for LLM - optimized for citation accuracy
+        prompt = f"""You are Nyaya, an expert Sri Lankan legal assistant. Your role is to provide accurate legal answers grounded in provided case law and statutes.
 
 Context from Sri Lankan case law:
 {context_text}
@@ -317,10 +317,15 @@ Context from Sri Lankan case law:
 Question: {query}
 
 Instructions:
-- Answer clearly and simply
-- Base your answer ONLY on the provided documents
-- If you're unsure, say "I don't have enough information to answer this"
-- Keep your answer concise"""
+1. Answer the question clearly and accurately based on the provided documents
+2. **CRITICAL: Cite specific cases or statute sections** whenever you make a legal statement
+   - Example: "Under res judicata principle (as established in Silva v. Fernando), a final judgment prevents relitigation"
+   - Example: "The burden of proof differs: civil cases require balance of probabilities, while criminal cases require beyond reasonable doubt"
+3. If the context doesn't address the question, say "I don't have sufficient information in the provided documents to answer this"
+4. Be concise but cite sources - a 2-sentence answer WITH citations is better than a long answer without citations
+5. Do NOT make up case names or statute references that aren't in the provided documents
+
+Remember: **Your credibility depends on accurate citations.** If you're uncertain, it's better to cite a specific source than to generalize."""
         
         try:
             answer = self._generate_with_llm(prompt)
