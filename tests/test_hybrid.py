@@ -1,7 +1,6 @@
 """
 Test script for hybrid retrieval (Phase 4)
 """
-import os
 from agent.agno_agent import NyayaAgent
 from dotenv import load_dotenv
 
