@@ -1,0 +1,283 @@
+{
+  "evaluation_dataset": [
+    {
+      "id": 1,
+      "category": "Case_Lookup_Graph",
+      "question": "Which cases cite Sirisena v. Kobbekaduwa?",
+      "ground_truth_answer": "Cases that follow or distinguish Sirisena v. Kobbekaduwa principle",
+      "ground_truth_citations": ["Sirisena v. Kobbekaduwa"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 2,
+      "category": "Case_Lookup_Graph",
+      "question": "What is the most cited criminal case in Sri Lankan law?",
+      "ground_truth_answer": "Should identify highly cited supreme court decisions",
+      "ground_truth_citations": ["Multiple criminal cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 3,
+      "category": "Semantic_Legal",
+      "question": "What principle was established regarding adverse possession in Sri Lankan law?",
+      "ground_truth_answer": "Possession in denial of title, prescriptive rights, time periods",
+      "ground_truth_citations": ["Adverse possession cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 4,
+      "category": "Semantic_Legal",
+      "question": "Explain the doctrine of res judicata",
+      "ground_truth_answer": "Finality of judgments, prevents relitigation, estoppel by judgment",
+      "ground_truth_citations": ["Cases applying res judicata"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 5,
+      "category": "Semantic_Legal",
+      "question": "What is the difference between civil and criminal burden of proof?",
+      "ground_truth_answer": "Civil: balance of probabilities (51%+), Criminal: beyond reasonable doubt (98%+)",
+      "ground_truth_citations": ["Burden of proof cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 6,
+      "category": "Citation_Accuracy",
+      "question": "What page in New-Law-Report-Vol-79-1.pdf discusses property succession between heirs?",
+      "ground_truth_answer": "Page 342 discusses title passing to heirs as constructive trustees",
+      "ground_truth_citations": ["New-Law-Report-Vol-79-1.pdf:342"],
+      "expected_pdf": "New-Law-Report-Vol-79-1.pdf",
+      "expected_page": 342,
+      "difficulty": "hard"
+    },
+    {
+      "id": 7,
+      "category": "Citation_Accuracy",
+      "question": "Which case discusses the burden of proof in criminal proceedings?",
+      "ground_truth_answer": "Should cite criminal procedure case with page number",
+      "ground_truth_citations": ["Specific criminal case with page"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 8,
+      "category": "Semantic_Legal",
+      "question": "What are the elements of a valid contract in Sri Lankan law?",
+      "ground_truth_answer": "Offer, acceptance, consideration, capacity, intention to create legal relations",
+      "ground_truth_citations": ["Contract law cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 9,
+      "category": "Semantic_Legal",
+      "question": "Explain the duty of care in negligence law",
+      "ground_truth_answer": "Reasonable foreseeability, proximity, reasonable person standard",
+      "ground_truth_citations": ["Negligence cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 10,
+      "category": "Semantic_Legal",
+      "question": "What are the grounds for judicial review in Sri Lanka?",
+      "ground_truth_answer": "Ultra vires, procedural fairness, natural justice, illegality",
+      "ground_truth_citations": ["Administrative law cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 11,
+      "category": "Citation_Accuracy",
+      "question": "How many pages does New-Law-Report-Vol-79-1.pdf have regarding property law?",
+      "ground_truth_answer": "Multiple pages covering property succession and title",
+      "ground_truth_citations": ["New-Law-Report-Vol-79-1.pdf"],
+      "expected_pdf": "New-Law-Report-Vol-79-1.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 12,
+      "category": "Semantic_Legal",
+      "question": "What is estoppel by conduct?",
+      "ground_truth_answer": "Prevents party from denying own representations, detrimental reliance",
+      "ground_truth_citations": ["Estoppel cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 13,
+      "category": "Semantic_Legal",
+      "question": "Explain quantum meruit",
+      "ground_truth_answer": "Claims for reasonable value of services rendered",
+      "ground_truth_citations": ["Contract remedy cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 14,
+      "category": "Semantic_Legal",
+      "question": "What is the doctrine of consideration?",
+      "ground_truth_answer": "Something of value exchanged, valuable consideration, executed consideration",
+      "ground_truth_citations": ["Contract formation cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 15,
+      "category": "Citation_Accuracy",
+      "question": "What is the ratio decidendi of the case about adverse possession?",
+      "ground_truth_answer": "Binding principle of the case (vs obiter dictum)",
+      "ground_truth_citations": ["Adverse possession case"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 16,
+      "category": "Semantic_Legal",
+      "question": "What is vicarious liability in tort law?",
+      "ground_truth_answer": "Employer liability for employee torts, scope of employment, respondeat superior",
+      "ground_truth_citations": ["Vicarious liability cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 17,
+      "category": "Semantic_Legal",
+      "question": "Explain the principle of prescription in property law",
+      "ground_truth_answer": "Time-based acquisition of rights, interruption of prescription, statutory periods",
+      "ground_truth_citations": ["Prescription cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 18,
+      "category": "Semantic_Legal",
+      "question": "What is the difference between obiter dictum and ratio decidendi?",
+      "ground_truth_answer": "Ratio: binding principle; Obiter: persuasive commentary not necessary for decision",
+      "ground_truth_citations": ["Case interpretation principles"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 19,
+      "category": "Semantic_Legal",
+      "question": "What are the requirements for a valid will in Sri Lankan law?",
+      "ground_truth_answer": "Testator capacity, proper execution, witnessing requirements, clear intention",
+      "ground_truth_citations": ["Succession law cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 20,
+      "category": "Semantic_Legal",
+      "question": "Explain the concept of mens rea in criminal law",
+      "ground_truth_answer": "Mental element of crime, intention, recklessness, criminal negligence",
+      "ground_truth_citations": ["Criminal intent cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 21,
+      "category": "Case_Lookup_Graph",
+      "question": "What cases establish principles about breach of contract remedies?",
+      "ground_truth_answer": "Damages, specific performance, injunction, rescission cases",
+      "ground_truth_citations": ["Contract remedy cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 22,
+      "category": "Semantic_Legal",
+      "question": "What is the statutory interpretation principle of ejusdem generis?",
+      "ground_truth_answer": "General words follow specific words, general applies to same class only",
+      "ground_truth_citations": ["Statutory interpretation cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 23,
+      "category": "Semantic_Legal",
+      "question": "Explain the doctrine of fundamental breach",
+      "ground_truth_answer": "Breach that deprives innocent party of substantially whole benefit, cannot exclude liability",
+      "ground_truth_citations": ["Fundamental breach cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 24,
+      "category": "Semantic_Legal",
+      "question": "What is the difference between fraud and misrepresentation?",
+      "ground_truth_answer": "Fraud: intentional false statement; Misrepresentation: unintentional/innocent false statement",
+      "ground_truth_citations": ["Fraud and misrepresentation cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 25,
+      "category": "Citation_Accuracy",
+      "question": "What is the page number for the leading case on offer and acceptance?",
+      "ground_truth_answer": "Should cite specific page with offer and acceptance principles",
+      "ground_truth_citations": ["Offer acceptance case with page"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 26,
+      "category": "Semantic_Legal",
+      "question": "Explain the concept of unjust enrichment",
+      "ground_truth_answer": "Recovery for benefits received without legal justification, quasi-contract remedy",
+      "ground_truth_citations": ["Unjust enrichment cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 27,
+      "category": "Semantic_Legal",
+      "question": "What are the elements of a valid easement?",
+      "ground_truth_answer": "Dominant and servient tenements, benefit to dominant land, not capable of detachment",
+      "ground_truth_citations": ["Easement law cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 28,
+      "category": "Semantic_Legal",
+      "question": "Explain the principle of locus standi in constitutional law",
+      "ground_truth_answer": "Right to bring action, must have direct interest or public interest standing",
+      "ground_truth_citations": ["Constitutional standing cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "medium"
+    },
+    {
+      "id": 29,
+      "category": "Case_Lookup_Graph",
+      "question": "Which cases define the test for negligence?",
+      "ground_truth_answer": "Establish reasonable person test, foreseeability, duty of care, breach, causation, damage",
+      "ground_truth_citations": ["Negligence principle cases"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    },
+    {
+      "id": 30,
+      "category": "Citation_Accuracy",
+      "question": "What page discusses the Torrens system for land title registration?",
+      "ground_truth_answer": "Should cite page with Torrens principle and indefeasibility of title",
+      "ground_truth_citations": ["Torrens system case with page"],
+      "expected_pdf": "New-Law-Report-*.pdf",
+      "difficulty": "hard"
+    }
+  ],
+  "evaluation_metrics": {
+    "Retrieval_Recall@5": "% of questions where correct document retrieved in top-5",
+    "Citation_Precision": "% of cited cases that are actually in retrieved documents",
+    "Answer_Groundedness": "% of answer sentences that appear in retrieved chunks",
+    "Hallucination_Detection": "% citations not found in retrieved metadata",
+    "Page_Accuracy": "% of page numbers cited correctly"
+  },
+  "instructions": "For each question, run the query and measure if ground truth was retrieved/answered correctly"
+}
