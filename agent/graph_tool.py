@@ -10,10 +10,15 @@ load_dotenv()
 
 class CitationGraph:
     def __init__(self):
-        self.driver = GraphDatabase.driver(
-            os.getenv("NEO4J_URI"),
-            auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
-        )
+        uri = os.getenv("NEO4J_URI")
+        user = os.getenv("NEO4J_USER")
+        password = os.getenv("NEO4J_PASSWORD")
+        
+        # Validate credentials are set
+        if not uri or not user or not password:
+            raise ValueError("NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD must be set in .env")
+        
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def get_case_info(self, case_name):
         normalized = normalize_title(case_name)
