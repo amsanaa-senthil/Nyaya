@@ -1,11 +1,6 @@
 from agent.agno_agent import NyayaAgent
-import re
 from optimizations import is_valid_query
-
-def clean_text(text):
-    text = re.sub(r'\s+', ' ', text)  # remove extra newlines and spaces
-    text = text.replace('\xad', '')   # remove OCR soft hyphens
-    return text.strip()
+from common_utils import clean_text
 
 
 if __name__ == "__main__":

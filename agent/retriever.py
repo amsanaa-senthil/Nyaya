@@ -13,46 +13,42 @@ from optimizations import (
     extract_query_terms,
     OPTIMIZED_SETTINGS,
 )
+from common_utils import clean_text, create_qdrant_client
 
 try:
-    from agno.knowledge.vector_db import VectorDB
-    from agno.embedder.sentence_transformer import SentenceTransformerEmbedder
+    from agno.knowledge.vector_db import VectorDB  # type: ignore
+    from agno.embedder.sentence_transformer import SentenceTransformerEmbedder  # type: ignore
     AGNO_AVAILABLE = True
 except ImportError:
     AGNO_AVAILABLE = False
     print("Warning: Agno not installed. Install with: pip install agno")
 
-def clean_text(text):
-    # Remove weird OCR hyphen splits
-    text = re.sub(r'\xAD', '', text)
-    text = re.sub(r'-\n', '', text)
+
+def _enrich_points(points, return_metadata=True):
+    """
+    Helper: Convert Qdrant points to enriched result format.
+    Eliminates code duplication between retrievers.
+    """
+    if not return_metadata:
+        return [clean_text((point.payload or {}).get("text", "")) for point in points]
     
-    # Remove excessive newlines
-    text = re.sub(r'\n+', ' ', text)
-    
-    # Remove extra spaces
-    text = re.sub(r'\s+', ' ', text)
+    enriched = []
+    for point in points:
+        payload = point.payload or {}
+        enriched.append({
+            "text": clean_text(payload.get("text", "")),
+            "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
+            "page": payload.get("page"),
+            "section": payload.get("section", "Unknown"),
+            "line_start": payload.get("line_start"),
+            "line_end": payload.get("line_end"),
+        })
+    return enriched
 
-    return text.strip()
-
-
-
-def _create_client():
-    host = os.getenv("QDRANT_HOST")
-    api_key = os.getenv("QDRANT_API_KEY")
-    if host:
-        return QdrantClient(
-            url=host,
-            api_key=api_key,
-            timeout=60  # Increase timeout for cloud connections
-        )
-    if QDRANT_HOST.startswith("http"):
-        return QdrantClient(url=QDRANT_HOST, api_key=api_key, timeout=60)
-    return QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
 class VectorRetriever:
     def __init__(self):
-        self.client = _create_client()
+        self.client = create_qdrant_client()
         self.collection_name = QDRANT_COLLECTION
         self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
@@ -66,22 +62,7 @@ class VectorRetriever:
             with_payload=True
         )
 
-        if not return_metadata:
-            return [clean_text(point.payload.get("text", "")) for point in results.points]
-
-        enriched = []
-        for point in results.points:
-            payload = point.payload or {}
-            enriched.append({
-                "text": clean_text(payload.get("text", "")),
-                "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
-                "page": payload.get("page"),
-                "section": payload.get("section", "Unknown"),
-                "line_start": payload.get("line_start"),
-                "line_end": payload.get("line_end"),
-            })
-
-        return enriched
+        return _enrich_points(results.points, return_metadata)
 
 
 class AgnoVectorRetriever:
@@ -90,13 +71,13 @@ class AgnoVectorRetriever:
         if not AGNO_AVAILABLE:
             raise ImportError("Agno not installed. Install with: pip install agno")
         
-        self.client = _create_client()
+        self.client = create_qdrant_client()
         self.collection_name = QDRANT_COLLECTION
         self.embedder = SentenceTransformerEmbedder(
             model="sentence-transformers/all-MiniLM-L6-v2"
         )
     
-    def search(self, query: str, top_k: int = 5, return_metadata=True) -> list[dict]:
+    def search(self, query: str, top_k: int = 5, return_metadata=True):
         """Search Qdrant vector database using Agno embedder"""
         query_vector = self.embedder.get_embedding(query)
         
@@ -107,22 +88,7 @@ class AgnoVectorRetriever:
             with_payload=True
         )
         
-        if not return_metadata:
-            return [clean_text(point.payload.get("text", "")) for point in results.points]
-
-        enriched = []
-        for point in results.points:
-            payload = point.payload or {}
-            enriched.append({
-                "text": clean_text(payload.get("text", "")),
-                "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
-                "page": payload.get("page"),
-                "section": payload.get("section", "Unknown"),
-                "line_start": payload.get("line_start"),
-                "line_end": payload.get("line_end"),
-            })
-
-        return enriched
+        return _enrich_points(results.points, return_metadata)
 
 
 class HybridRetriever:
@@ -174,7 +140,7 @@ class HybridRetriever:
             
             # Extract text and tokenize for BM25
             for point in all_docs[0]:
-                text = point.payload.get("text", "")
+                text = (point.payload or {}).get("text", "")
                 cleaned = clean_text(text)
                 if len(cleaned) > 20:  # Skip very short docs
                     # Tokenize: split by whitespace and lowercase

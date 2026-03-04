@@ -5,23 +5,12 @@ from qdrant_client.models import (
     PointStruct,
 )
 from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
+from common_utils import create_qdrant_client
 import os
 import time
 import hashlib
 import uuid
 
-
-def _create_client():
-    """Create Qdrant client with robust timeout for cloud instances."""
-    timeout_seconds = 600  # 10 minutes for large batch uploads to cloud
-    
-    if QDRANT_HOST.startswith("http"):
-        return QdrantClient(
-            url=QDRANT_HOST, 
-            api_key=os.getenv("QDRANT_API_KEY"),
-            timeout=timeout_seconds
-        )
-    return QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=timeout_seconds)
 
 def _stable_point_id(pdf_name, page, section, text):
     """Generate a stable UUID from chunk metadata.
@@ -35,7 +24,7 @@ def _stable_point_id(pdf_name, page, section, text):
 
 
 def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
-    client = _create_client()
+    client = create_qdrant_client(timeout_seconds=600)
 
     collection_name = QDRANT_COLLECTION
 
@@ -131,7 +120,7 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
                         # Recreate client after connection error
                         if attempt >= 2:
                             print(f"  Reconnecting to Qdrant...")
-                            client = _create_client()
+                            client = create_qdrant_client(timeout_seconds=600)
                     else:
                         print(f" FAILED after {max_retries} attempts (continuing with other batches)...")
                         failed_batches.append(batch_num)

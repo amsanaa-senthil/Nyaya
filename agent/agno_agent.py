@@ -4,21 +4,10 @@ from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
 from optimizations import score_result_relevance, extract_query_terms
 from agent.llm import generate_answer
+from common_utils import clean_text
 from dotenv import load_dotenv
 
 load_dotenv()
-
-def clean_text(text):
-    """
-    Cleans OCR and PDF text:
-    - removes extra spaces/newlines
-    - removes soft hyphens
-    """
-    if not text:
-        return ""
-    text = re.sub(r'\s+', ' ', text)
-    text = text.replace('\xad', '')
-    return text.strip()
 
 
 class NyayaAgent:
