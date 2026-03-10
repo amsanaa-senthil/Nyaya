@@ -2,6 +2,7 @@ import re
 import time
 from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
+from agent.guardrails import LegalGuardrails, SafetyFilter, CitationValidator
 from optimizations import score_result_relevance, extract_query_terms
 from agent.llm import generate_answer
 from common_utils import clean_text
@@ -11,20 +12,39 @@ load_dotenv()
 
 
 class NyayaAgent:
-    def __init__(self, use_agno=False, show_debug=False):
+    def __init__(self, show_debug=False):
         # Initialize graph and retriever
         self.graph = CitationGraph()
         self.show_debug = show_debug  # Suppress debug output for end users
         
-        # Disable Agno for now (package incompatibility)
-        self.use_agno = False
+        # Initialize guardrails
+        self.guardrails = LegalGuardrails()
+        self.safety_filter = SafetyFilter()
+        self.citation_validator = CitationValidator()
         
         if self.show_debug:
             print("[OK] Using hybrid retrieval (vector 60% + BM25 40%) with Neo4j integration")
+            print("[OK] Guardrails enabled for legal accuracy and safety")
         self.retriever = HybridRetriever()
         
         # Azure OpenAI is configured in llm.py
         self.last_llm_error = None
+
+    @staticmethod
+    def _deduplicate_cases(cases, max_results=20):
+        """Deduplicate case list by normalized case name"""
+        seen = set()
+        unique_cases = []
+        for item in cases:
+            # Handle both tuples (case, count) and strings
+            case = item[0] if isinstance(item, tuple) else item
+            case_normalized = case.lower().strip()
+            if case_normalized not in seen and len(case) > 5:
+                seen.add(case_normalized)
+                unique_cases.append(item)
+            if len(unique_cases) >= max_results:
+                break
+        return unique_cases
 
     def _generate_with_llm(self, prompt: str) -> str:
         """Generate answer using Azure OpenAI (configured in llm.py)"""
@@ -129,6 +149,11 @@ class NyayaAgent:
     def ask(self, query):
         query_lower = query.lower()
 
+        # 🛡️ GUARDRAIL 1: Safety filter (check for unsafe queries)
+        is_safe, safety_reason = self.safety_filter.check_safety(query)
+        if not is_safe:
+            return self.safety_filter.get_refusal_message(safety_reason)
+
         # Guardrail: avoid wasting LLM calls on vague/low-information inputs
         query_terms = extract_query_terms(query)
         if len(query_terms) < 2 and len(query.split()) < 2:
@@ -136,7 +161,6 @@ class NyayaAgent:
         
         # ENHANCED: Detect specific case queries (e.g., "Bulankulama v. Secretary")
         # Pattern: "word v. word" or "word vs word" or "word vs. word"
-        import re
         case_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:v\.|vs\.?|versus)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*'
         case_match = re.search(case_pattern, query)
         
@@ -207,16 +231,7 @@ class NyayaAgent:
                 top = []
             if top:
                 # Deduplicate and keep only unique cases (show top 20)
-                seen = set()
-                unique_cases = []
-                for case, count in top:
-                    # Normalize for deduplication
-                    case_normalized = case.lower().strip()
-                    if case_normalized not in seen:
-                        seen.add(case_normalized)
-                        unique_cases.append((case, count))
-                    if len(unique_cases) >= 20:  # Limit to top 20 unique
-                        break
+                unique_cases = self._deduplicate_cases(top, max_results=20)
                 
                 if unique_cases:
                     result = "**Top 20 Most Cited Cases:**\n\n"
@@ -237,15 +252,7 @@ class NyayaAgent:
                 cited = []
             if cited:
                 # Deduplicate similar cases
-                seen = set()
-                unique_cited = []
-                for case in cited:
-                    case_normalized = case.lower().strip()
-                    if case_normalized not in seen and len(case) > 5:
-                        seen.add(case_normalized)
-                        unique_cited.append(case)
-                    if len(unique_cited) >= 15:
-                        break
+                unique_cited = self._deduplicate_cases(cited, max_results=15)
                 
                 if unique_cited:
                     result = f"**Cases cited in {query}:**\n\n"
@@ -255,9 +262,17 @@ class NyayaAgent:
                     return result
         
         # For general queries: retrieve context and use LLM
+        retrieval_query = query
+        burden_keywords = ["burden of proof", "standard of proof", "beyond reasonable doubt"]
+        if any(keyword in query_lower for keyword in burden_keywords):
+            retrieval_query = (
+                f"{query} prosecution must prove beyond reasonable doubt "
+                "criminal trial presumption rebuttable evidence ordinance"
+            )
+
         try:
             start = time.time()
-            context_chunks = self.retriever.search(query, top_k=3, return_metadata=True)
+            context_chunks = self.retriever.search(retrieval_query, top_k=3, return_metadata=True)
             if self.show_debug:
                 print("Retrieval time:", time.time() - start)
         except Exception as e:
@@ -280,6 +295,7 @@ class NyayaAgent:
         # Limit total context to avoid overwhelming the model
         context_blocks = []
         for cleaned, chunk in clean_chunks[:2]:
+            cleaned_excerpt = cleaned[:1200]
             if isinstance(chunk, dict):
                 pdf = chunk.get("pdf_name") or "Unknown"
                 page = chunk.get("page") or "Unknown"
@@ -288,51 +304,112 @@ class NyayaAgent:
                 line_end = chunk.get("line_end") or "Unknown"
                 context_blocks.append(
                     "TEXT:\n{0}\n\nSOURCE:\nPDF: {1}\nPage: {2}\nSection: {3}\nLines: {4}-{5}\n-----------------------".format(
-                        cleaned, pdf, page, section, line_start, line_end
+                        cleaned_excerpt, pdf, page, section, line_start, line_end
                     )
                 )
             else:
-                context_blocks.append(cleaned)
+                context_blocks.append(cleaned_excerpt)
 
         context_text = "\n\n".join(context_blocks)
         self.last_llm_error = None
         
-        # Build prompt for LLM - optimized for citation accuracy
-        prompt = f"""You are Nyaya, an expert Sri Lankan legal assistant. Your role is to provide accurate legal answers grounded in provided case law and statutes.
+        # Build prompt for LLM - conversational ChatGPT-style
+        prompt = f"""You are Nyaya, a helpful Sri Lankan legal assistant. Answer questions naturally like ChatGPT, using the provided legal documents as your source.
 
-Context from Sri Lankan case law:
+**Context from case law:**
 {context_text}
 
-Question: {query}
+**Question:** {query}
 
-Instructions:
-1. Answer the question clearly and accurately based on the provided documents
-2. **CRITICAL: Cite specific cases or statute sections** whenever you make a legal statement
-   - Example: "Under res judicata principle (as established in Silva v. Fernando), a final judgment prevents relitigation"
-   - Example: "The burden of proof differs: civil cases require balance of probabilities, while criminal cases require beyond reasonable doubt"
-3. If the context doesn't address the question, say "I don't have sufficient information in the provided documents to answer this"
-4. Be concise but cite sources - a 2-sentence answer WITH citations is better than a long answer without citations
-5. Do NOT make up case names or statute references that aren't in the provided documents
+**How to answer:**
+- Write in natural, conversational English (like ChatGPT or Gemini)
+- Explain concepts clearly, don't just copy-paste
+- Use proper grammar and complete sentences
+- Include case citations naturally in your explanation
+- If you need to quote, paraphrase it naturally
+- Keep it concise (2 short paragraphs max)
+- Start with the general legal rule first, then explain any section-specific application
+- If the context is narrow, explicitly say it is a specific example and avoid presenting it as the whole law
+- End with a one-line takeaway
 
-Remember: **Your credibility depends on accurate citations.** If you're uncertain, it's better to cite a specific source than to generalize."""
+Example good answer:
+"In Sri Lankan law, the burden of proof works differently depending on the case type. For civil cases, the standard is 'balance of probabilities' - meaning you just need to show it's more likely than not. But for criminal cases, it's much stricter: 'beyond reasonable doubt.' This distinction was emphasized in the case of Karunaratne v. Republic (1981), where the Supreme Court clarified these standards."
+
+Now answer the user's question naturally:"""
         
         try:
             answer = self._generate_with_llm(prompt)
             
+            # 🛡️ GUARDRAIL 2: Validate response with guardrails
+            is_valid, validated_answer, warnings = self.guardrails.check_response(
+                answer, 
+                [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]
+            )
+            
+            if warnings and self.show_debug:
+                for warning in warnings:
+                    print(f"[GUARDRAIL] {warning}")
+            
+            # Use validated (potentially modified) answer
+            answer = validated_answer
+            
+            # 🛡️ GUARDRAIL 3: Citation validation
+            citations = self.citation_validator.extract_citations(answer)
+            if citations:
+                validation = self.citation_validator.validate_against_sources(
+                    citations,
+                    [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]
+                )
+                groundedness = self.citation_validator.get_groundedness_score(validation)
+                
+                if self.show_debug:
+                    print(f"[CITATION] Groundedness score: {groundedness:.2%}")
+                
+                # Warn if low groundedness
+                if groundedness < 0.7 and len(citations) > 0:
+                    answer += "\n\n⚠️ *Some citations may not be directly from the retrieved documents.*"
+            
             # Append manual citations if not already present
-            if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer:
-                answer += "\n\n**Sources:**\n"
-                for i, (_, chunk) in enumerate(clean_chunks[:2], 1):
+            if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer and "Page " not in answer:
+                answer += "\n\n**📚 Sources:**\n"
+                seen_sources = set()
+                source_index = 1
+                for _, chunk in clean_chunks[:3]:
                     if isinstance(chunk, dict):
                         pdf = chunk.get("pdf_name", "Unknown")
                         page = chunk.get("page", "?")
-                        section = chunk.get("section", "Unknown")
-                        line_start = chunk.get("line_start", "?")
-                        line_end = chunk.get("line_end", "?")
-                        answer += f"{i}. (Source: {pdf}, Page {page}, Section: {section}, Lines {line_start}-{line_end})\n"
+                        source_key = f"{pdf}|{page}"
+                        if source_key in seen_sources:
+                            continue
+                        seen_sources.add(source_key)
+                        answer += f"{source_index}. {pdf}, Page {page}\n"
+                        source_index += 1
+                        if source_index > 2:
+                            break
+            
+            # 🛡️ GUARDRAIL 4: Add legal disclaimer
+            answer = self.guardrails.add_disclaimer(answer)
             
             return answer
         except Exception as e:
+            error_msg = str(e)
             if self.show_debug:
-                print(f"[DEBUG] LLM generation failed, using retrieval fallback: {e}")
+                print(f"[DEBUG] LLM generation failed: {error_msg}")
+            
+            # Show helpful error if LLM not configured
+            if "No LLM configured" in error_msg:
+                return """⚠️ **LLM Not Configured**
+
+I can retrieve relevant documents, but I need an AI model (Azure OpenAI or Gemini) to generate natural answers.
+
+**Quick fix:** Add to your `.env` file:
+```
+GEMINI_API_KEY=your-key-here
+```
+Get free Gemini key: https://makersuite.google.com/app/apikey
+
+Meanwhile, here's what I found in the documents:
+
+""" + self._build_retrieval_fallback_answer(query, clean_chunks)
+            
             return self._build_retrieval_fallback_answer(query, clean_chunks)

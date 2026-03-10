@@ -1,6 +1,5 @@
 from agent.agno_agent import NyayaAgent
 from optimizations import is_valid_query
-from common_utils import clean_text
 
 
 if __name__ == "__main__":

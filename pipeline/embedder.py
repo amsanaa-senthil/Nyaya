@@ -1,8 +1,11 @@
 # embedder.py
 from sentence_transformers import SentenceTransformer
 
-# Load model once globally
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+# Load model once globally (use cached version to avoid network issues)
+model = SentenceTransformer(
+    "sentence-transformers/all-MiniLM-L6-v2",
+    local_files_only=True
+)
 
 def embed_chunks(chunks):
     """

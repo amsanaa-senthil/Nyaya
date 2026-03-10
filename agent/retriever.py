@@ -41,7 +41,7 @@ class HybridRetriever:
         """Build BM25 index from all documents in Qdrant"""
         try:
             print("Building BM25 index from Qdrant collection...")
-            
+
             # Scroll through all points in collection
             all_points = []
             all_texts = []

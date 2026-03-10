@@ -13,12 +13,19 @@ wheels/
 
 pdfs/
 
-# Fine-tuning artifacts
-finetune/data/
-finetune/output/
-
 # Evaluation files (keep local only)
 evaluation_dataset.json
+evaluation_results.json
+optimization_results.json
 TEST_QUESTIONS.md
 
+# Cache files
 .query_cache/
+.bm25_index.pkl
+.index_state.json
+
+# Development/testing scripts (not needed in production)
+check_metadata.py
+optimize_weights.py
+analyze_optimization.py
+test_prompt.py

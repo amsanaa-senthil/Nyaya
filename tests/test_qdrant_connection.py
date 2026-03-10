@@ -23,7 +23,15 @@ try:
     print(f"\n[SUCCESS] Connected to Qdrant!")
     print(f"Collection: {collection}")
     print(f"Vector count: {collection_info.points_count}")
-    print(f"Vector size: {collection_info.config.params.vectors.size}")
+    vectors_config = collection_info.config.params.vectors
+    vector_size = "unknown"
+    if isinstance(vectors_config, dict):
+        first_cfg = next(iter(vectors_config.values()), None)
+        if first_cfg is not None:
+            vector_size = str(getattr(first_cfg, "size", "unknown"))
+    elif vectors_config is not None:
+        vector_size = str(getattr(vectors_config, "size", "unknown"))
+    print(f"Vector size: {vector_size}")
     
 except Exception as e:
     print(f"\n[ERROR] Connection failed: {e}")
