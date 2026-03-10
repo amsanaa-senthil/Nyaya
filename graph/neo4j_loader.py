@@ -42,7 +42,7 @@ def extract_metadata_from_text(text):
     # Extract year (4-digit numbers between 1900-2099)
     year_match = re.search(r'\b(19|20)\d{2}\b', text)
     if year_match:
-        metadata["year"] = int(year_match.group(0))
+        metadata["year"] = int(year_match.group(0))  # type: ignore
     
     # Extract court abbreviations (SC, CA, D.C., etc.)
     court_patterns = [
@@ -54,7 +54,7 @@ def extract_metadata_from_text(text):
     ]
     for pattern in court_patterns:
         if re.search(pattern, text):
-            metadata["court"] = pattern.replace(r'\b', '').replace(r'\\b', '').replace('.', '')
+            metadata["court"] = pattern.replace(r'\b', '').replace(r'\\b', '').replace('.', '')  # type: ignore
             break
     
     # Extract procedural stage
@@ -67,18 +67,18 @@ def extract_metadata_from_text(text):
     }
     for stage, pattern in stage_keywords.items():
         if re.search(pattern, text, re.IGNORECASE):
-            metadata["stage"] = stage
+            metadata["stage"] = stage  # type: ignore
             break
     
     # Extract volume number (e.g., "79 NLR" or "Vol. 79")
     vol_match = re.search(r'(?:vol\.?\s*)?(\d{1,3})\s*(?:NLR|SLR|LR)\b', text, re.IGNORECASE)
     if vol_match:
-        metadata["volume"] = int(vol_match.group(1))
+        metadata["volume"] = int(vol_match.group(1))  # type: ignore
     
     # Extract citation (e.g., "79 NLR 123")
     citation_match = re.search(r'(\d{1,3}\s+(?:NLR|SLR|LR)\s+\d{1,4})', text)
     if citation_match:
-        metadata["citation"] = citation_match.group(1)
+        metadata["citation"] = citation_match.group(1)  # type: ignore
     
     return metadata
 
