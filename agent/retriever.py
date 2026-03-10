@@ -15,14 +15,6 @@ from optimizations import (
 )
 from common_utils import clean_text, create_qdrant_client
 
-try:
-    from agno.knowledge.vector_db import VectorDB  # type: ignore
-    from agno.embedder.sentence_transformer import SentenceTransformerEmbedder  # type: ignore
-    AGNO_AVAILABLE = True
-except ImportError:
-    AGNO_AVAILABLE = False
-    print("Warning: Agno not installed. Install with: pip install agno")
-
 
 def _enrich_points(points, return_metadata=True):
     """
@@ -66,34 +58,6 @@ class VectorRetriever:
             with_payload=True
         )
 
-        return _enrich_points(results.points, return_metadata)
-
-
-class AgnoVectorRetriever:
-    """Agno-powered retriever for Qdrant vector database"""
-    def __init__(self):
-        if not AGNO_AVAILABLE:
-            raise ImportError("Agno not installed. Install with: pip install agno")
-        
-        self.client = create_qdrant_client()
-        self.collection_name = QDRANT_COLLECTION
-        # Use local_files_only to avoid network permission issues
-        self.embedder = SentenceTransformerEmbedder(
-            model="sentence-transformers/all-MiniLM-L6-v2",
-            local_files_only=True
-        )
-    
-    def search(self, query: str, top_k: int = 5, return_metadata=True):
-        """Search Qdrant vector database using Agno embedder"""
-        query_vector = self.embedder.get_embedding(query)
-        
-        results = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            limit=top_k,
-            with_payload=True
-        )
-        
         return _enrich_points(results.points, return_metadata)
 
 
