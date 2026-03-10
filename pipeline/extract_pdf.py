@@ -28,10 +28,11 @@ def extract_pages_from_pdf(pdf_path):
     doc = fitz.open(pdf_path)
     pages = []
 
-    for page_number, page in enumerate(doc, start=1):
+    for page_number in range(len(doc)):
+        page = doc[page_number]
         page_text = page.get_text("text")
         page_text = _clean_text(page_text)
-        pages.append({"page_number": page_number, "text": page_text})
+        pages.append({"page_number": page_number + 1, "text": page_text})
 
     doc.close()
     return pages
