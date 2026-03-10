@@ -50,7 +50,11 @@ class VectorRetriever:
     def __init__(self):
         self.client = create_qdrant_client()
         self.collection_name = QDRANT_COLLECTION
-        self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        # Use local_files_only to avoid network permission issues on Windows
+        self.model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2",
+            local_files_only=True
+        )
 
     def search(self, query, top_k=5, return_metadata=True):
         query_vector = self.model.encode(query).tolist()
@@ -73,8 +77,10 @@ class AgnoVectorRetriever:
         
         self.client = create_qdrant_client()
         self.collection_name = QDRANT_COLLECTION
+        # Use local_files_only to avoid network permission issues
         self.embedder = SentenceTransformerEmbedder(
-            model="sentence-transformers/all-MiniLM-L6-v2"
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            local_files_only=True
         )
     
     def search(self, query: str, top_k: int = 5, return_metadata=True):
@@ -127,12 +133,20 @@ class HybridRetriever:
             # For cloud instances, fetching all documents can timeout
             # In that case, we fallback to vector-only search
             try:
+                import socket
                 all_docs = self.client.scroll(
                     collection_name=self.collection_name,
-                    limit=10000  # Adjust if you have more documents
+                    limit=10000,  # Adjust if you have more documents
+                    timeout=30  # 30 second timeout to prevent hanging
                 )
+            except (TimeoutError, socket.error, OSError, ConnectionError) as scroll_err:
+                print(f"[WARNING] Could not fetch all docs for BM25 (network/timeout): {type(scroll_err).__name__}")
+                print("[INFO] Switching to vector-only search (BM25 disabled)")
+                self.documents = []
+                self.bm25_model = None
+                return
             except Exception as scroll_err:
-                print(f"[WARNING] Could not fetch all docs for BM25 (timeout or connection): {type(scroll_err).__name__}")
+                print(f"[WARNING] Could not fetch all docs for BM25: {type(scroll_err).__name__}")
                 print("[INFO] Switching to vector-only search (BM25 disabled)")
                 self.documents = []
                 self.bm25_model = None
