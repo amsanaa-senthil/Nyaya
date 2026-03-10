@@ -1,262 +1,256 @@
+"""
+Hybrid retrieval combining semantic search (Qdrant) and BM25 keyword search
+Weights: Semantic 60% + BM25 40%
+"""
+
+from typing import List, Dict, Optional, Union
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
-from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
-import os
-from dotenv import load_dotenv
-load_dotenv()
-import re
 from rank_bm25 import BM25Okapi
-from optimizations import (
-    get_cached_query_result,
-    cache_query_result,
-    filter_results_by_threshold,
-    extract_query_terms,
-    OPTIMIZED_SETTINGS,
-)
 from common_utils import clean_text, create_qdrant_client
-
-
-def _enrich_points(points, return_metadata=True):
-    """
-    Helper: Convert Qdrant points to enriched result format.
-    Eliminates code duplication between retrievers.
-    """
-    if not return_metadata:
-        return [clean_text((point.payload or {}).get("text", "")) for point in points]
-    
-    enriched = []
-    for point in points:
-        payload = point.payload or {}
-        enriched.append({
-            "text": clean_text(payload.get("text", "")),
-            "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
-            "page": payload.get("page"),
-            "section": payload.get("section", "Unknown"),
-            "line_start": payload.get("line_start"),
-            "line_end": payload.get("line_end"),
-        })
-    return enriched
-
-
-class VectorRetriever:
-    def __init__(self):
-        self.client = create_qdrant_client()
-        self.collection_name = QDRANT_COLLECTION
-        # Use local_files_only to avoid network permission issues on Windows
-        self.model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2",
-            local_files_only=True
-        )
-
-    def search(self, query, top_k=5, return_metadata=True):
-        query_vector = self.model.encode(query).tolist()
-
-        results = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            limit=top_k,
-            with_payload=True
-        )
-
-        return _enrich_points(results.points, return_metadata)
+from config import QDRANT_COLLECTION, EMBEDDING_MODEL
+import numpy as np
 
 
 class HybridRetriever:
-    """
-    Hybrid retriever combining vector search (semantic) and BM25 (keyword).
+    """Combines semantic (vector) and BM25 (keyword) retrieval"""
     
-    Combines:
-    - Vector search: 70% weight (semantic similarity)
-    - BM25 search: 30% weight (exact matches, legal terms)
-    
-    This improves precision for legal queries which often include:
-    - Exact case names
-    - Specific legal citations
-    - Domain-specific terminology
-    """
-    
-    def __init__(self):
-        self.vector_retriever = VectorRetriever()
-        self.client = self.vector_retriever.client
-        self.collection_name = self.vector_retriever.collection_name
-        self.bm25_corpus = None
-        self.bm25_model = None
-        self.documents = None
+    def __init__(self, semantic_weight: float = 0.6, bm25_weight: float = 0.4):
+        """
+        Initialize hybrid retriever
         
-        # Build BM25 index from all documents in Qdrant
+        Args:
+            semantic_weight: Weight for semantic/vector results (default 0.6)
+            bm25_weight: Weight for BM25 keyword results (default 0.4)
+        """
+        self.semantic_weight = semantic_weight
+        self.bm25_weight = bm25_weight
+        
+        # Initialize Qdrant client
+        self.qdrant_client = create_qdrant_client()
+        
+        # Initialize embedding model
+        print(f"Loading embedding model: {EMBEDDING_MODEL}")
+        self.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
+        
+        # Build BM25 index from collection
         self._build_bm25_index()
     
     def _build_bm25_index(self):
-        """Fetch all documents from Qdrant and build BM25 index"""
+        """Build BM25 index from all documents in Qdrant"""
         try:
-            # Initialize as empty list (not None) to avoid NoneType errors
-            self.documents = []
-            documents = []
+            print("Building BM25 index from Qdrant collection...")
+
+            # Scroll through all points in collection
+            all_points = []
+            all_texts = []
             
-            # Get all documents from Qdrant
-            # For cloud instances, fetching all documents can timeout
-            # In that case, we fallback to vector-only search
-            try:
-                import socket
-                all_docs = self.client.scroll(
-                    collection_name=self.collection_name,
-                    limit=10000,  # Adjust if you have more documents
-                    timeout=30  # 30 second timeout to prevent hanging
-                )
-            except (TimeoutError, socket.error, OSError, ConnectionError) as scroll_err:
-                print(f"[WARNING] Could not fetch all docs for BM25 (network/timeout): {type(scroll_err).__name__}")
-                print("[INFO] Switching to vector-only search (BM25 disabled)")
-                self.documents = []
-                self.bm25_model = None
-                return
-            except Exception as scroll_err:
-                print(f"[WARNING] Could not fetch all docs for BM25: {type(scroll_err).__name__}")
-                print("[INFO] Switching to vector-only search (BM25 disabled)")
-                self.documents = []
-                self.bm25_model = None
-                return
+            # Get all points from collection
+            scroll_result = self.qdrant_client.scroll(
+                collection_name=QDRANT_COLLECTION,
+                limit=1000
+            )
             
-            # Extract text and tokenize for BM25
-            for point in all_docs[0]:
-                text = (point.payload or {}).get("text", "")
+            points, _ = scroll_result
+            all_points.extend(points)
+            
+            # Extract texts for BM25
+            for point in all_points:
+                payload = point.payload or {}
+                text = payload.get("text", "")
                 cleaned = clean_text(text)
-                if len(cleaned) > 20:  # Skip very short docs
-                    # Tokenize: split by whitespace and lowercase
-                    tokens = cleaned.lower().split()
-                    documents.append(tokens)
-                    self.documents.append({
-                        "text": cleaned,
-                        "id": point.id,
-                        "payload": point.payload or {}
+                if cleaned:
+                    all_texts.append(cleaned)
+            
+            # Tokenize and build BM25
+            self.bm25_texts = all_texts
+            tokenized_corpus = [doc.split() for doc in all_texts]
+            self.bm25_index = BM25Okapi(tokenized_corpus)
+            
+            print(f"[OK] Built BM25 index from {len(all_texts)} documents")
+        
+        except Exception as e:
+            print(f"[WARNING] BM25 index building failed: {e}")
+            self.bm25_index = None
+            self.bm25_texts = []
+    
+    def _semantic_search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Search using vector embeddings (Qdrant)"""
+        try:
+            # Embed query
+            query_embedding = self.embedding_model.encode(query)
+            
+            # Search in Qdrant using scroll-based approach
+            search_results = []
+            scroll_result = self.qdrant_client.scroll(
+                collection_name=QDRANT_COLLECTION,
+                limit=10000
+            )
+            
+            points, _ = scroll_result
+            
+            # Score and rank points
+            scored_points = []
+            for point in points:
+                if point.payload is None:
+                    continue
+                    
+                # Get point vector and compute similarity
+                point_vector = point.vector if hasattr(point, 'vector') else None
+                if point_vector is not None:
+                    # Cosine similarity
+                    sim = np.dot(query_embedding, point_vector) / (
+                        np.linalg.norm(query_embedding) * np.linalg.norm(point_vector) + 1e-8
+                    )
+                    scored_points.append((sim, point))
+            
+            # Sort by score and get top-k
+            scored_points.sort(key=lambda x: x[0], reverse=True)
+            top_points = scored_points[:top_k]
+            
+            results = []
+            for score, point in top_points:
+                payload = point.payload or {}
+                results.append({
+                    "score": float(score),
+                    "text": payload.get("text", ""),
+                    "pdf_name": payload.get("pdf_name", "Unknown"),
+                    "page": payload.get("page", "?"),
+                    "section": payload.get("section", "Unknown"),
+                    "line_start": payload.get("line_start", "?"),
+                    "line_end": payload.get("line_end", "?"),
+                })
+            
+            return results
+        
+        except Exception as e:
+            print(f"[WARNING] Semantic search failed: {e}")
+            return []
+    
+    def _bm25_search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Search using BM25 keyword matching"""
+        try:
+            if not self.bm25_index or not self.bm25_texts:
+                return []
+            
+            # Tokenize query
+            query_tokens = query.lower().split()
+            
+            # Get BM25 scores
+            scores = self.bm25_index.get_scores(query_tokens)
+            
+            # Get top-k indices
+            top_indices = np.argsort(scores)[::-1][:top_k]
+            
+            results = []
+            for idx in top_indices:
+                if scores[idx] > 0:  # Only include positive scores
+                    text = self.bm25_texts[idx]
+                    results.append({
+                        "score": float(scores[idx]),
+                        "text": text,
+                        "pdf_name": "Unknown",  # BM25 index doesn't have metadata
+                        "page": "?",
+                        "section": "Unknown",
+                        "line_start": "?",
+                        "line_end": "?",
                     })
             
-            # Build BM25 model
-            if documents:
-                self.bm25_model = BM25Okapi(documents)
-                print(f"[OK] Built BM25 index from {len(documents)} documents")
-            else:
-                print("[WARNING] No documents found for BM25 indexing")
-                self.documents = []
-                
+            return results
+        
         except Exception as e:
-            print(f"[WARNING] Failed to build BM25 index: {e}")
-            # Ensure documents is an empty list, not None
-            if self.documents is None:
-                self.documents = []
-            self.bm25_model = None
+            print(f"[WARNING] BM25 search failed: {e}")
+            return []
     
-    def search(self, query, top_k=5, return_metadata=True, vector_weight=0.6):
-        """
-        Hybrid search combining vector and BM25 scores.
+    def _merge_results(
+        self, 
+        semantic_results: List[Dict], 
+        bm25_results: List[Dict], 
+        top_k: int = 5
+    ) -> List[Dict]:
+        """Merge and rank results from both retrievers"""
         
-        Args:
-            query: Search query string
-            top_k: Number of results to return
-            return_metadata: Include document metadata
-            vector_weight: Weight for vector score (0.0-1.0), BM25 gets (1-vector_weight)
-            
-        Returns:
-            List of ranked documents
-        """
-        bm25_weight = 1.0 - vector_weight
+        # Normalize scores
+        if semantic_results:
+            max_semantic_score = max(r["score"] for r in semantic_results)
+            for r in semantic_results:
+                r["normalized_score"] = (r["score"] / max_semantic_score) if max_semantic_score > 0 else 0
         
-        # Check cache first (skip if exact match found)
-        if OPTIMIZED_SETTINGS.get("cache_enabled"):
-            cached = get_cached_query_result(query)
-            if cached:
-                # Debug: print(f"[CACHE HIT] Retrieved cached results for query")
-                if return_metadata:
-                    return cached[:top_k]
-                return [r.get("text", "") for r in cached[:top_k]]
+        if bm25_results:
+            max_bm25_score = max(r["score"] for r in bm25_results)
+            for r in bm25_results:
+                r["normalized_score"] = (r["score"] / max_bm25_score) if max_bm25_score > 0 else 0
         
-        # Get vector search results (always available)
-        vector_results = self.vector_retriever.search(query, top_k=top_k*2, return_metadata=True)
+        # Create combined ranking by text (to avoid duplicates)
+        text_to_result = {}
         
-        # Get BM25 scores (fallback to vector-only if BM25 failed)
-        bm25_scores = {}
-        if self.bm25_model and self.documents and len(self.documents) > 0:
-            try:
-                query_tokens = extract_query_terms(query)
-                if not query_tokens:
-                    query_tokens = clean_text(query).lower().split()
-                bm25_ranking = self.bm25_model.get_scores(query_tokens)
-                
-                # Create mapping of doc_id to BM25 score
-                for i, score in enumerate(bm25_ranking):
-                    bm25_scores[i] = score
-            except Exception as e:
-                pass
+        # Add semantic results
+        for result in semantic_results:
+            text_key = result["text"][:200]  # Use first 200 chars as key
+            if text_key not in text_to_result:
+                text_to_result[text_key] = {
+                    **result,
+                    "semantic_score": result.get("normalized_score", 0),
+                    "bm25_score": 0,
+                    "combined_score": 0,
+                }
         
-        # Combine and rank results
-        combined_results = {}
+        # Add/merge BM25 results
+        for result in bm25_results:
+            text_key = result["text"][:200]
+            if text_key not in text_to_result:
+                text_to_result[text_key] = {
+                    **result,
+                    "semantic_score": 0,
+                    "bm25_score": result.get("normalized_score", 0),
+                    "combined_score": 0,
+                }
+            else:
+                text_to_result[text_key]["bm25_score"] = result.get("normalized_score", 0)
         
-        # Add vector results with vector scores
-        for i, doc in enumerate(vector_results):
-            doc_id = id(doc)  # Use doc object id as key
-            # Vector score is already normalized (0-1) by Qdrant
-            vector_score = 1.0 - (i / (len(vector_results) + 1))  # Inverse rank scoring
-            combined_results[doc_id] = {
-                "doc": doc,
-                "vector_score": vector_score,
-                "bm25_score": 0.0,
-                "final_score": vector_score * vector_weight
-            }
+        # Calculate combined scores
+        for result in text_to_result.values():
+            result["combined_score"] = (
+                self.semantic_weight * result.get("semantic_score", 0) +
+                self.bm25_weight * result.get("bm25_score", 0)
+            )
         
-        # Add BM25 scores for documents (only if available)
-        if self.documents and len(self.documents) > 0:
-            for i, doc in enumerate(self.documents):
-                bm25_score = bm25_scores.get(i, 0.0)
-                if bm25_score > 0:
-                    doc_id = id(doc)
-                    # Normalize BM25 score to 0-1 range
-                    max_bm25 = max(bm25_scores.values()) if bm25_scores else 1.0
-                    normalized_bm25 = bm25_score / max(max_bm25, 1.0)
-                    
-                    if doc_id in combined_results:
-                        # Update existing result
-                        combined_results[doc_id]["bm25_score"] = normalized_bm25
-                        combined_results[doc_id]["final_score"] = (
-                            combined_results[doc_id]["vector_score"] * vector_weight +
-                            normalized_bm25 * bm25_weight
-                        )
-                    else:
-                        # Add new result from BM25
-                        combined_results[doc_id] = {
-                            "doc": {
-                                "text": doc["text"],
-                                "pdf_name": doc["payload"].get("pdf_name", "Unknown"),
-                                "page": doc["payload"].get("page", "Unknown"),
-                                "section": doc["payload"].get("section", "Unknown"),
-                                "line_start": doc["payload"].get("line_start"),
-                                "line_end": doc["payload"].get("line_end"),
-                            },
-                            "vector_score": 0.0,
-                            "bm25_score": normalized_bm25,
-                            "final_score": normalized_bm25 * bm25_weight
-                        }
-        
-        # Sort by final score and return top_k
-        sorted_results = sorted(
-            combined_results.values(),
-            key=lambda x: x["final_score"],
+        # Sort by combined score
+        merged = sorted(
+            text_to_result.values(),
+            key=lambda r: r["combined_score"],
             reverse=True
-        )
-        
-        # Apply relevance filtering (accuracy improvement)
-        docs_for_filtering = [r["doc"] for r in sorted_results]
-        filtered_results = filter_results_by_threshold(
-            docs_for_filtering,
-            query,
-            threshold=OPTIMIZED_SETTINGS.get("result_threshold", 0.32)
         )[:top_k]
         
-        # Cache results for future queries
-        if OPTIMIZED_SETTINGS.get("cache_enabled"):
-            cache_query_result(query, filtered_results)
+        return merged
+    
+    def search(
+        self, 
+        query: str, 
+        top_k: int = 5,
+        return_metadata: bool = False
+    ) -> Union[List[str], List[Dict]]:
+        """
+        Hybrid search combining semantic and BM25 retrieval
+        
+        Args:
+            query: Search query
+            top_k: Number of results to return
+            return_metadata: If True, return full metadata dicts; if False, return text only
+        
+        Returns:
+            List of results (strings if return_metadata=False, dicts if True)
+        """
+        # Get results from both retrievers
+        semantic_results = self._semantic_search(query, top_k=top_k)
+        bm25_results = self._bm25_search(query, top_k=top_k)
+        
+        # Merge and rank
+        merged_results = self._merge_results(semantic_results, bm25_results, top_k=top_k)
         
         if return_metadata:
-            return filtered_results
+            return merged_results
         else:
-            return [clean_text(r.get("text", "")) for r in filtered_results]
-
-
+            # Return text only
+            return [r["text"] for r in merged_results]
