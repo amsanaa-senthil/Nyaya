@@ -1,6 +1,7 @@
 # agent/llm.py
 
 import os
+from typing import Any, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,8 +14,8 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-pre
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Initialize the appropriate client
-llm_backend = None
-client = None
+llm_backend: Optional[str] = None
+client: Any = None
 
 if AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT:
     try:
@@ -31,9 +32,9 @@ if AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT:
 
 if not llm_backend and GEMINI_API_KEY:
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        client = genai.GenerativeModel('gemini-2.0-flash-exp')
+        import google.generativeai as genai  # type: ignore
+        genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
+        client = genai.GenerativeModel('gemini-2.0-flash-exp')  # type: ignore
         llm_backend = "gemini"
         print("[LLM] Using Gemini (free)")
     except Exception as e:
@@ -54,7 +55,7 @@ def generate_answer(prompt):
     
     try:
         if llm_backend == "azure":
-            def _extract_text(resp):
+            def _extract_text(resp: Any) -> tuple[str, Optional[str]]:
                 if not resp.choices:
                     return "", None
                 choice = resp.choices[0]
@@ -80,7 +81,7 @@ def generate_answer(prompt):
 
                 return "", finish_reason
 
-            response = client.chat.completions.create(
+            response = client.chat.completions.create(  # type: ignore
                 model=AZURE_OPENAI_DEPLOYMENT,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=1,
@@ -91,7 +92,7 @@ def generate_answer(prompt):
                 return extracted_text
 
             if finish_reason == "length":
-                retry_response = client.chat.completions.create(
+                retry_response = client.chat.completions.create(  # type: ignore
                     model=AZURE_OPENAI_DEPLOYMENT,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=1,
@@ -104,7 +105,7 @@ def generate_answer(prompt):
             # Fallback for models that can return empty content in chat completions
             # while still being able to produce text via Responses API.
             try:
-                fallback = client.responses.create(
+                fallback = client.responses.create(  # type: ignore
                     model=AZURE_OPENAI_DEPLOYMENT,
                     input=prompt,
                     max_output_tokens=800,
@@ -118,7 +119,7 @@ def generate_answer(prompt):
             raise RuntimeError("Azure returned an empty response")
         
         elif llm_backend == "gemini":
-            response = client.generate_content(prompt)
+            response = client.generate_content(prompt)  # type: ignore
             return response.text
     
     except Exception as e:
