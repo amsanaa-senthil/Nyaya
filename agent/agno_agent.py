@@ -12,13 +12,10 @@ load_dotenv()
 
 
 class NyayaAgent:
-    def __init__(self, use_agno=False, show_debug=False):
+    def __init__(self, show_debug=False):
         # Initialize graph and retriever
         self.graph = CitationGraph()
         self.show_debug = show_debug  # Suppress debug output for end users
-        
-        # Disable Agno for now (package incompatibility)
-        self.use_agno = False
         
         # Initialize guardrails
         self.guardrails = LegalGuardrails()
@@ -32,6 +29,22 @@ class NyayaAgent:
         
         # Azure OpenAI is configured in llm.py
         self.last_llm_error = None
+
+    @staticmethod
+    def _deduplicate_cases(cases, max_results=20):
+        """Deduplicate case list by normalized case name"""
+        seen = set()
+        unique_cases = []
+        for item in cases:
+            # Handle both tuples (case, count) and strings
+            case = item[0] if isinstance(item, tuple) else item
+            case_normalized = case.lower().strip()
+            if case_normalized not in seen and len(case) > 5:
+                seen.add(case_normalized)
+                unique_cases.append(item)
+            if len(unique_cases) >= max_results:
+                break
+        return unique_cases
 
     def _generate_with_llm(self, prompt: str) -> str:
         """Generate answer using Azure OpenAI (configured in llm.py)"""
@@ -148,7 +161,6 @@ class NyayaAgent:
         
         # ENHANCED: Detect specific case queries (e.g., "Bulankulama v. Secretary")
         # Pattern: "word v. word" or "word vs word" or "word vs. word"
-        import re
         case_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:v\.|vs\.?|versus)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*'
         case_match = re.search(case_pattern, query)
         
@@ -219,16 +231,7 @@ class NyayaAgent:
                 top = []
             if top:
                 # Deduplicate and keep only unique cases (show top 20)
-                seen = set()
-                unique_cases = []
-                for case, count in top:
-                    # Normalize for deduplication
-                    case_normalized = case.lower().strip()
-                    if case_normalized not in seen:
-                        seen.add(case_normalized)
-                        unique_cases.append((case, count))
-                    if len(unique_cases) >= 20:  # Limit to top 20 unique
-                        break
+                unique_cases = self._deduplicate_cases(top, max_results=20)
                 
                 if unique_cases:
                     result = "**Top 20 Most Cited Cases:**\n\n"
@@ -249,15 +252,7 @@ class NyayaAgent:
                 cited = []
             if cited:
                 # Deduplicate similar cases
-                seen = set()
-                unique_cited = []
-                for case in cited:
-                    case_normalized = case.lower().strip()
-                    if case_normalized not in seen and len(case) > 5:
-                        seen.add(case_normalized)
-                        unique_cited.append(case)
-                    if len(unique_cited) >= 15:
-                        break
+                unique_cited = self._deduplicate_cases(cited, max_results=15)
                 
                 if unique_cited:
                     result = f"**Cases cited in {query}:**\n\n"
