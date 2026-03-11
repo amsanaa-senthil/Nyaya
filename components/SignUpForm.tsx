@@ -19,46 +19,55 @@ export default function SignUpForm() {
     confirmPassword:""
   });
 
-  //Function to update the state as the user types
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  //Function to send data to your route.ts
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  //Function to update the state as the user types
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
+  if (formData.password !== formData.confirmPassword) {
+    alert("Passwords do not match!");
+    return;
+  }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          first_name: formData.firstName,
-          surname: formData.surname,
-          username: formData.username,
-        },
-      },
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      // Create query string for success page
-      const queryString = new URLSearchParams({
-        firstName: formData.firstName,
+  const { data, error } = await supabase.auth.signUp({
+    email: formData.email,
+    password: formData.password,
+    options: {
+      data: {
+        first_name: formData.firstName,
         surname: formData.surname,
         username: formData.username,
-        email: formData.email,
-      }).toString();
+      },
+    },
+  });
 
-      router.push(`/signup_success?${queryString}`);
-    }
-  };
+  if (error) {
+    // This will catch "User already registered", "Password too short", etc.
+    alert(error.message); 
+    return; // Stop the code here so it doesn't redirect!
+  }
+
+  // Supabase "Fake Success" Check:
+  // If email confirmation is ON, Supabase returns data but no session.
+  // If the user already exists, sometimes 'data.user' is null or identities are empty.
+  if (data.user && data.user.identities && data.user.identities.length === 0) {
+    alert("This email is already in use. Please try logging in.");
+    return;
+  }
+
+  // ONLY redirect if there was no error and it's a new user
+  const queryString = new URLSearchParams({
+    firstName: formData.firstName,
+    surname: formData.surname,
+    username: formData.username,
+    email: formData.email,
+  }).toString();
+
+  router.push(`/signup_success?${queryString}`);
+};
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
