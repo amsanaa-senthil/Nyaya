@@ -28,6 +28,20 @@ export default function LoginForm() {
     }
   };
 
+// Reset Password
+const handleResetPassword = async (email: string) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // This is where the user is sent AFTER clicking the link in their email
+    redirectTo: `${window.location.origin}/auth/update-password`,
+  });
+
+  if (error) {
+    alert(error.message);
+  } else {
+    alert("Password reset email sent! Check your inbox.");
+  }
+};
+
   // Google Login 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -93,6 +107,22 @@ export default function LoginForm() {
         >
           {loading ? "Logging in..." : "Login"}
         </button>
+
+        <div className="flex justify-center mb-4">
+          <button 
+            type="button"
+            onClick={() => {
+              if (!email) {
+                alert("Please enter your email address first!");
+                return;
+              }
+              handleResetPassword(email);
+            }}
+            className="text-xs text-blue-600 hover:underline font-medium"
+          >
+            Forgot password?
+          </button>
+        </div>
 
         <div className="flex items-center my-6">
           <div className="flex-grow border-t border-gray-300"></div>
