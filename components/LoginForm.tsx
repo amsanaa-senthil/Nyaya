@@ -11,22 +11,42 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
+  let loginEmail = email; // Staring with whatever the user typed
 
-    if (error) {
-      alert(error.message);
+  // 1. CHECK IF INPUT IS A USERNAME (doesn't contain '@')
+  if (!email.includes("@")) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("email") 
+      .eq("username", email)
+      .single();
+
+    if (profileError || !profile) {
+      alert("Username not found. Please check or use your email.");
       setLoading(false);
-    } else {
-      router.push("/dashboard"); 
+      return;
     }
-  };
+    
+    loginEmail = profile.email; // Switch to the actual email found in DB
+  }
+
+  // 2. PROCEED WITH SUPABASE LOGIN
+  const { error } = await supabase.auth.signInWithPassword({
+    email: loginEmail,
+    password: password,
+  });
+
+  if (error) {
+    alert(error.message);
+    setLoading(false);
+  } else {
+    router.push("/dashboard"); 
+  }
+};
 
 // Reset Password
 const handleResetPassword = async (email: string) => {
@@ -62,6 +82,7 @@ const handleResetPassword = async (email: string) => {
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+
       <div className="flex justify-center mb-4">
         <Image src="/Nyaya_logo_temp.png" alt="NYAYA Logo" width={80} height={80} className="rounded-full shadow-sm" />
       </div>
@@ -71,15 +92,15 @@ const handleResetPassword = async (email: string) => {
       {/* 1. FIXED: Added handleLogin to onSubmit */}
       <form className="space-y-4" onSubmit={handleLogin}>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email or User Name</label>
           <div className="relative">
-            <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
+            <UserCircle className="absolute left-3 top-3 text-gray-400" size={18} />
             <input 
-              type="email" 
+              type="text" 
               required
-              value={email} // 2. FIXED: Connected state
+              value={email} 
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder="Enter your email or User Name"
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" 
             />
           </div>

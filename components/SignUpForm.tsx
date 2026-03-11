@@ -27,6 +27,12 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
+  // Validate Username: No '@' allowed
+  if (formData.username.includes("@")) {
+    alert("Usernames cannot contain the '@' symbol. Please choose another.");
+    return;
+  }
+
   if (formData.password !== formData.confirmPassword) {
     alert("Passwords do not match!");
     return;
