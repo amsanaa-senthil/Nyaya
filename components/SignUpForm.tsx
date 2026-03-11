@@ -3,6 +3,7 @@ import { User, Mail, Lock, UserCircle } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
+import { supabase } from "../lib/supabaseClient";
 
 export default function SignUpForm() {
 
@@ -32,29 +33,30 @@ export default function SignUpForm() {
       return;
     }
 
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData), // This sends the data to your route.ts
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          first_name: formData.firstName,
+          surname: formData.surname,
+          username: formData.username,
+        },
+      },
     });
 
-    const result = await response.json();
-    if (response.ok) {
-      // 1. Destructure the data you want to pass (from the backend response)
-      const { firstName, surname, username, email } = result.user;
-
-      // 2. Create a query string so the success page can read these details
+    if (error) {
+      alert(error.message);
+    } else {
+      // Create query string for success page
       const queryString = new URLSearchParams({
-        firstName,
-        surname,
-        username,
-        email,
+        firstName: formData.firstName,
+        surname: formData.surname,
+        username: formData.username,
+        email: formData.email,
       }).toString();
 
-      // 3. Redirect the user to your new success page
       router.push(`/signup_success?${queryString}`);
-    } else {
-      alert(result.error || "Something went wrong");
     }
   };
 
@@ -84,6 +86,7 @@ export default function SignUpForm() {
               value={formData.firstName}
               onChange={handleChange}
               type="text" 
+              required
               placeholder="John" 
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" name="firstName" onChange={handleChange} />
           </div>
@@ -95,6 +98,7 @@ export default function SignUpForm() {
               value={formData.surname}
               onChange={handleChange}
               type="text" 
+              required
               placeholder="Doe" 
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" name="surname" onChange={handleChange} />
           </div>
@@ -110,6 +114,7 @@ export default function SignUpForm() {
               value={formData.email}
               onChange={handleChange}
               type="email" 
+              required
               placeholder="john@example.com" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
@@ -125,6 +130,7 @@ export default function SignUpForm() {
               value={formData.username}
               onChange={handleChange}
               type="text" 
+              required
               placeholder="johndoe123" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
@@ -140,6 +146,7 @@ export default function SignUpForm() {
               value={formData.password}
               onChange={handleChange}
               type="password" 
+              required
               placeholder="••••••••" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
@@ -155,6 +162,7 @@ export default function SignUpForm() {
               value={formData.confirmPassword}
               onChange={handleChange}
               type="password" 
+              required
               placeholder="••••••••" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
