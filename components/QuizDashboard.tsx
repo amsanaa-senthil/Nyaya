@@ -1,18 +1,56 @@
 "use client";
 
-import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2 } from "lucide-react";
+import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 export default function QuizDashboard() {
-  // Mock data - replace with PostgreSQL fetch later
-  const stats = {
-    totalQuizzes: 12,
-    avgScore: 78,
-    highestScore: 95,
-    lowestScore: 62,
-    accuracy: 84,
-    avgTime: "4m 20s",
-    totalTime: "120m 45s"
+  const router = useRouter();
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Helper to convert seconds to "Xm Ys"
+  const formatTime = (seconds: number) => {
+    if (!seconds) return "0m 0s";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
   };
+
+  useEffect(() => {
+    async function getDashboardData() {
+      // 1. Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        router.push("/login");
+        return;
+      }
+
+      // 2. Fetch Profile and Stats from your new tables
+      const [profileRes, statsRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("user_stats").select("*").eq("id", user.id).single()
+      ]);
+
+      setUserProfile(profileRes.data);
+      setUserStats(statsRes.data);
+      setLoading(false);
+    }
+
+    getDashboardData();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading Nyaya Dashboard...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 md:p-10">
@@ -21,43 +59,51 @@ export default function QuizDashboard() {
         {/* User Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              S
+            <div className="h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold uppercase">
+              {userProfile?.first_name?.charAt(0) || "U"}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Welcome back, Sanithu!</h1>
+              <h1 className="text-2xl font-bold text-gray-800">
+                Welcome back, {userProfile?.first_name || "Student"}!
+              </h1>
               <p className="text-gray-500 text-sm">Track your Nyaya learning progress here.</p>
             </div>
           </div>
-          <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
-            <PlayCircle size={20} />
-            Start New Quiz
-          </button>
+          
+          <div className="flex gap-3">
+             <button 
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-3 rounded-xl font-semibold transition-all"
+            >
+              <LogOut size={20} />
+            </button>
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
+              <PlayCircle size={20} />
+              Start New Quiz
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           
-          {/* Total Quizzes */}
           <StatCard 
             title="Total Quizzes Taken" 
-            value={stats.totalQuizzes} 
+            value={userStats?.total_quizzes_taken || 0} 
             icon={<LayoutDashboard className="text-blue-600" />} 
             color="bg-blue-50"
           />
 
-          {/* Average Score */}
           <StatCard 
             title="Average Score" 
-            value={`${stats.avgScore}%`} 
+            value={`${userStats?.average_score || 0}%`} 
             icon={<BarChart2 className="text-purple-600" />} 
             color="bg-purple-50"
           />
 
-          {/* Accuracy Rate */}
           <StatCard 
             title="Accuracy Rate" 
-            value={`${stats.accuracy}%`} 
+            value={`${userStats?.accuracy_rate || 0}%`} 
             icon={<Target className="text-green-600" />} 
             color="bg-green-50"
           />
@@ -73,30 +119,28 @@ export default function QuizDashboard() {
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-xs text-gray-400 uppercase">Highest</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.highestScore}%</p>
+                <p className="text-2xl font-bold text-gray-800">{userStats?.highest_score || 0}%</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 uppercase">Lowest</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.lowestScore}%</p>
+                <p className="text-2xl font-bold text-gray-800">{userStats?.lowest_score || 0}%</p>
               </div>
             </div>
           </div>
 
-          {/* Time Spent */}
           <StatCard 
             title="Time Spent per Quiz" 
-            value={stats.avgTime} 
+            value={formatTime(userStats?.time_spent_per_quiz_seconds)} 
             icon={<Clock className="text-red-600" />} 
             color="bg-red-50"
           />
 
-                    <StatCard 
+          <StatCard 
             title="Total Quizing Time" 
-            value={stats.totalTime} 
+            value={formatTime(userStats?.total_quizzing_time_seconds)} 
             icon={<Clock className="text-blue-600" />} 
             color="bg-blue-50"
           />
-
         </div>
       </div>
     </div>
