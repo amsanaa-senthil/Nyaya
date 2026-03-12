@@ -11,9 +11,29 @@ from optimizations import (
     cache_query_result,
     filter_results_by_threshold,
     extract_query_terms,
+    canonicalize_legal_query,
     OPTIMIZED_SETTINGS,
 )
 from common_utils import clean_text, create_qdrant_client
+from resilience import CircuitBreaker, call_with_retry
+
+
+def _safe_year(value):
+    try:
+        year = int(value)
+        if 1800 <= year <= 2100:
+            return year
+    except Exception:
+        pass
+    return None
+
+
+def _recency_bonus(year, current_year=2026):
+    if year is None:
+        return 0.0
+    age = max(current_year - year, 0)
+    # Smooth decay: newer authorities get a mild ranking bonus.
+    return 1.0 / (1.0 + (age / 10.0))
 
 
 def _enrich_points(points, return_metadata=True):
@@ -34,6 +54,8 @@ def _enrich_points(points, return_metadata=True):
             "section": payload.get("section", "Unknown"),
             "line_start": payload.get("line_start"),
             "line_end": payload.get("line_end"),
+            "year": _safe_year(payload.get("year")),
+            "qdrant_score": float(getattr(point, "score", 0.0) or 0.0),
         })
     return enriched
 
@@ -42,6 +64,7 @@ class VectorRetriever:
     def __init__(self):
         self.client = create_qdrant_client()
         self.collection_name = QDRANT_COLLECTION
+        self.breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30.0)
         # Use local_files_only to avoid network permission issues on Windows
         self.model = SentenceTransformer(
             "sentence-transformers/all-MiniLM-L6-v2",
@@ -51,11 +74,15 @@ class VectorRetriever:
     def search(self, query, top_k=5, return_metadata=True):
         query_vector = self.model.encode(query).tolist()
 
-        results = self.client.query_points(
+        results = call_with_retry(
+            self.client.query_points,
             collection_name=self.collection_name,
             query=query_vector,
             limit=top_k,
-            with_payload=True
+            with_payload=True,
+            retries=2,
+            timeout_seconds=20,
+            circuit_breaker=self.breaker,
         )
 
         return _enrich_points(results.points, return_metadata)
@@ -98,10 +125,14 @@ class HybridRetriever:
             # In that case, we fallback to vector-only search
             try:
                 import socket
-                all_docs = self.client.scroll(
+                all_docs = call_with_retry(
+                    self.client.scroll,
                     collection_name=self.collection_name,
                     limit=10000,  # Adjust if you have more documents
-                    timeout=30  # 30 second timeout to prevent hanging
+                    timeout=30,  # Qdrant API timeout
+                    retries=1,
+                    timeout_seconds=35,
+                    circuit_breaker=self.vector_retriever.breaker,
                 )
             except (TimeoutError, socket.error, OSError, ConnectionError) as scroll_err:
                 print(f"[WARNING] Could not fetch all docs for BM25 (network/timeout): {type(scroll_err).__name__}")
@@ -158,7 +189,9 @@ class HybridRetriever:
         Returns:
             List of ranked documents
         """
+        query = canonicalize_legal_query(query)
         bm25_weight = 1.0 - vector_weight
+        recency_weight = float(OPTIMIZED_SETTINGS.get("recency_weight", 0.10))
         
         # Check cache first (skip if exact match found)
         if OPTIMIZED_SETTINGS.get("cache_enabled"):
@@ -215,12 +248,16 @@ class HybridRetriever:
                     if doc_id in combined_results:
                         # Update existing result
                         combined_results[doc_id]["bm25_score"] = normalized_bm25
+                        recency = _recency_bonus(_safe_year(doc["payload"].get("year")))
+                        combined_results[doc_id]["recency_score"] = recency
                         combined_results[doc_id]["final_score"] = (
                             combined_results[doc_id]["vector_score"] * vector_weight +
-                            normalized_bm25 * bm25_weight
+                            normalized_bm25 * bm25_weight +
+                            recency * recency_weight
                         )
                     else:
                         # Add new result from BM25
+                        recency = _recency_bonus(_safe_year(doc["payload"].get("year")))
                         combined_results[doc_id] = {
                             "doc": {
                                 "text": doc["text"],
@@ -229,10 +266,13 @@ class HybridRetriever:
                                 "section": doc["payload"].get("section", "Unknown"),
                                 "line_start": doc["payload"].get("line_start"),
                                 "line_end": doc["payload"].get("line_end"),
+                                "year": _safe_year(doc["payload"].get("year")),
+                                "qdrant_score": 0.0,
                             },
                             "vector_score": 0.0,
                             "bm25_score": normalized_bm25,
-                            "final_score": normalized_bm25 * bm25_weight
+                            "recency_score": recency,
+                            "final_score": normalized_bm25 * bm25_weight + recency * recency_weight
                         }
         
         # Sort by final score and return top_k
@@ -249,6 +289,14 @@ class HybridRetriever:
             query,
             threshold=OPTIMIZED_SETTINGS.get("result_threshold", 0.32)
         )[:top_k]
+
+        # Attach final retrieval score for downstream confidence policies.
+        filtered_by_text = {doc.get("text", "")[:500]: doc for doc in filtered_results if isinstance(doc, dict)}
+        for item in sorted_results:
+            doc = item.get("doc", {})
+            text_key = (doc.get("text", "") if isinstance(doc, dict) else "")[:500]
+            if text_key in filtered_by_text:
+                filtered_by_text[text_key]["retrieval_score"] = round(float(item.get("final_score", 0.0)), 4)
         
         # Cache results for future queries
         if OPTIMIZED_SETTINGS.get("cache_enabled"):

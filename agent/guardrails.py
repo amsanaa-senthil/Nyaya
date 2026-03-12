@@ -99,6 +99,71 @@ Sri Lankan law is complex—consult a qualified attorney for your specific situa
 """
         return response + disclaimer
 
+    @staticmethod
+    def _build_context_text(context_chunks: List[Dict]) -> str:
+        return "\n".join((chunk.get("text", "") if isinstance(chunk, dict) else "") for chunk in context_chunks).lower()
+
+    def reflection_self_check(self, draft_answer: str, context_chunks: List[Dict]) -> Tuple[str, Dict[str, object]]:
+        """
+        Remove unsupported claims from the answer before final output.
+        Rules:
+        - If "Section N" is mentioned but does not appear in retrieved context, drop that sentence.
+        - If "Page N" is mentioned but no retrieved chunk has that page, drop that sentence.
+        """
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', draft_answer) if s.strip()]
+        if not sentences:
+            return draft_answer, {
+                "removed_sentences": 0,
+                "checked_sentences": 0,
+                "reason_counts": {},
+                "groundedness_score": 0.0,
+            }
+
+        context_text = self._build_context_text(context_chunks)
+        known_pages = {
+            str(chunk.get("page"))
+            for chunk in context_chunks
+            if isinstance(chunk, dict) and chunk.get("page") is not None
+        }
+
+        kept = []
+        removed = 0
+        reason_counts = {"section": 0, "page": 0}
+
+        for sentence in sentences:
+            sentence_lower = sentence.lower()
+
+            section_refs = re.findall(r'section\s+\d+[a-zA-Z0-9-]*', sentence_lower)
+            page_refs = re.findall(r'page\s+(\d+)', sentence_lower)
+
+            unsupported_section = any(section_ref not in context_text for section_ref in section_refs)
+            unsupported_page = any(page_num not in known_pages for page_num in page_refs)
+
+            if unsupported_section:
+                removed += 1
+                reason_counts["section"] += 1
+                continue
+
+            if unsupported_page:
+                removed += 1
+                reason_counts["page"] += 1
+                continue
+
+            kept.append(sentence)
+
+        revised = " ".join(kept).strip()
+        if not revised:
+            revised = draft_answer
+
+        groundedness_score = (len(kept) / len(sentences)) if sentences else 0.0
+        report = {
+            "removed_sentences": removed,
+            "checked_sentences": len(sentences),
+            "reason_counts": reason_counts,
+            "groundedness_score": groundedness_score,
+        }
+        return revised, report
+
 
 class CitationValidator:
     """Validates that all citations in response are properly sourced"""
