@@ -1,11 +1,13 @@
 import re
 import time
+from typing import Dict, List, Optional
 from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
 from agent.guardrails import LegalGuardrails, SafetyFilter, CitationValidator
-from optimizations import score_result_relevance, extract_query_terms
+from optimizations import score_result_relevance, extract_query_terms, OPTIMIZED_SETTINGS, canonicalize_legal_query
 from agent.llm import generate_answer
 from common_utils import clean_text
+from agent.prompts import SYSTEM_PROMPT
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -146,123 +148,153 @@ class NyayaAgent:
 
         return "\n".join(lines)
 
-    def ask(self, query):
-        query_lower = query.lower()
-
-        # 🛡️ GUARDRAIL 1: Safety filter (check for unsafe queries)
-        is_safe, safety_reason = self.safety_filter.check_safety(query)
-        if not is_safe:
-            return self.safety_filter.get_refusal_message(safety_reason)
-
-        # Guardrail: avoid wasting LLM calls on vague/low-information inputs
-        query_terms = extract_query_terms(query)
-        if len(query_terms) < 2 and len(query.split()) < 2:
-            return "Please ask a more specific legal question (e.g., 'difference between civil and criminal burden of proof')."
-        
-        # ENHANCED: Detect specific case queries (e.g., "Bulankulama v. Secretary")
-        # Pattern: "word v. word" or "word vs word" or "word vs. word"
+    @staticmethod
+    def _extract_case_name(query: str) -> Optional[str]:
+        # Pattern: "word v. word" or "word vs word" or "word versus word"
         case_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:v\.|vs\.?|versus)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*'
         case_match = re.search(case_pattern, query)
-        
-        if case_match:
-            case_name = case_match.group(0)
-            if self.show_debug:
-                print(f"[ROUTER] Detected case query: {case_name}")
-            
-            # Get citation network from graph
-            try:
-                # Get cases this case cites
-                cites = self.graph.get_cited_cases(case_name, limit=10)
-                
-                # Get cases that cite this case (DISTINCTION LEVEL)
-                cited_by = self.graph.get_cited_by(case_name, limit=10)
-                
-                # Get citation count
-                case_info = self.graph.get_case_info(case_name)
-                
-                if cited_by or cites or case_info:
-                    result = f"**Citation Analysis: {case_name}**\n\n"
-                    
-                    if case_info:
-                        citation_count = case_info.get("citation_count", 0)
-                        result += f"This case has been cited {citation_count} times.\n\n"
-                    
-                    if cited_by:
-                        result += f"**Cases that cite {case_name}:**\n"
-                        for i, case in enumerate(cited_by, 1):
-                            result += f"{i}. {case}\n"
-                        result += "\n"
-                    
-                    if cites:
-                        result += f"**Cases cited by {case_name}:**\n"
-                        for i, case in enumerate(cites, 1):
-                            result += f"{i}. {case}\n"
+        if not case_match:
+            return None
+        return case_match.group(0)
 
-                    result += self._build_case_source_block(case_name)
-                    return result
-                else:
-                    if self.show_debug:
-                        print(f"[INFO] No citation data found for '{case_name}', checking similar case titles")
-                    similar_cases = self.graph.find_similar_cases(case_name, limit=10)
-                    if similar_cases:
-                        result = f"**No exact citation network found for: {case_name}**\n\n"
-                        result += "**Similar case titles in graph:**\n"
-                        for i, case in enumerate(similar_cases, 1):
-                            result += f"{i}. {case}\n"
-                        result += "\nTry one of the above exact titles for network analysis."
-                        result += self._build_case_source_block(case_name)
-                        return result
-                    if self.show_debug:
-                        print(f"[INFO] No similar graph cases found for '{case_name}', falling back to retrieval")
-            except Exception as e:
-                if self.show_debug:
-                    print(f"[WARNING] Graph query failed for case '{case_name}': {e}")
-        
-        # Handle citation-specific queries with graph data
-        if "most cited" in query_lower or "top cited" in query_lower:
+    @staticmethod
+    def _build_source_map(answer: str, chunks: List[Dict]) -> List[Dict]:
+        paragraphs = [p.strip() for p in answer.split("\n\n") if p.strip()]
+        source_map = []
+        for index, para in enumerate(paragraphs, 1):
+            matched = None
+            best_overlap = 0
+            para_terms = set(extract_query_terms(para))
+            for chunk in chunks:
+                if not isinstance(chunk, dict):
+                    continue
+                text = chunk.get("text", "")
+                chunk_terms = set(extract_query_terms(text))
+                overlap = len(para_terms & chunk_terms)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    matched = chunk
+            if matched:
+                source_map.append({
+                    "paragraph_id": index,
+                    "snippet": para[:180],
+                    "pdf_name": matched.get("pdf_name", "Unknown"),
+                    "page": matched.get("page"),
+                    "section": matched.get("section", "Unknown"),
+                    "qdrant_score": round(float(best_overlap) / max(len(para_terms), 1), 3),
+                    "exact_quote": (matched.get("text", "") or "")[:320],
+                })
+        return source_map
+
+    @staticmethod
+    def _null_result_message(topic: str) -> str:
+        return (
+            "I have searched the authenticated database and found no specific "
+            f"Sri Lankan statutory or case law regarding {topic}. "
+            "Please provide a narrower fact pattern, exact case name, or statute reference."
+        )
+
+    def _build_precedent_chain_for_query(self, query: str, case_name: Optional[str]) -> List[Dict]:
+        if case_name:
+            return self.graph.get_top_related_precedents(case_name, limit=3)
+
+        chain = self.graph.get_query_precedent_chain(query, limit=1)
+        if not chain:
+            return []
+
+        # Flatten first anchor for API friendliness
+        first = chain[0]
+        return first.get("related", [])
+
+    def ask_with_report(self, query: str, debug_mode: bool = False) -> Dict[str, object]:
+        start_total = time.time()
+        query_lower = query.lower()
+        debug_trace = []
+
+        def log_step(msg: str):
+            if debug_mode or self.show_debug:
+                debug_trace.append(msg)
+
+        # Step 1: Safety filter
+        is_safe, safety_reason = self.safety_filter.check_safety(query)
+        if not is_safe:
+            refusal = self.safety_filter.get_refusal_message(safety_reason)
+            return {
+                "question": query,
+                "answer": refusal,
+                "status": "blocked",
+                "source_map": [],
+                "precedent_chain": [],
+                "groundedness_score": 0.0,
+                "reflection_report": {},
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
+
+        # Step 2: Input quality check
+        query_terms = extract_query_terms(query)
+        if len(query_terms) < 2 and len(query.split()) < 2:
+            return {
+                "question": query,
+                "answer": "Please ask a more specific legal question (e.g., 'difference between civil and criminal burden of proof').",
+                "status": "needs_clarification",
+                "source_map": [],
+                "precedent_chain": [],
+                "groundedness_score": 0.0,
+                "reflection_report": {},
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
+
+        # Step 3: Analyze query and decide graph-first path
+        case_name = self._extract_case_name(query)
+        graph_context_lines = []
+        precedent_chain = []
+        temporal_warnings = []
+        if case_name:
+            log_step(f"analyze: detected case name '{case_name}', running graph-first traversal")
             try:
-                start = time.time()
-                top = self.graph.get_most_cited(50)  # Get more to filter duplicates
-                if self.show_debug:
-                    print("Graph query time:", time.time() - start)
+                cited_by = self.graph.get_precedent_history(case_name, limit=10)
+                cites = self.graph.get_cited_cases(case_name, limit=10)
+                precedent_chain = self.graph.get_top_related_precedents(case_name, limit=3)
+                temporal_warnings = self.graph.get_temporal_warnings(case_name, limit=10)
+
+                if cited_by:
+                    graph_context_lines.append(f"Later citing cases for {case_name}: " + "; ".join(cited_by[:5]))
+                if cites:
+                    graph_context_lines.append(f"Cases cited by {case_name}: " + "; ".join(cites[:5]))
+                if temporal_warnings:
+                    warning_cases = "; ".join(
+                        f"{w.get('case')} ({w.get('status')})" for w in temporal_warnings[:3]
+                    )
+                    graph_context_lines.append(f"Temporal warning: potentially weakened precedents found: {warning_cases}")
             except Exception as e:
-                if self.show_debug:
-                    print("Graph query failed:", e)
-                top = []
-            if top:
-                # Deduplicate and keep only unique cases (show top 20)
+                log_step(f"graph failure: {type(e).__name__}: {e}")
+        elif "most cited" in query_lower or "top cited" in query_lower:
+            log_step("analyze: graph statistics query detected")
+            try:
+                top = self.graph.get_most_cited(50)
                 unique_cases = self._deduplicate_cases(top, max_results=20)
-                
                 if unique_cases:
-                    result = "**Top 20 Most Cited Cases:**\n\n"
+                    answer = "**Top 20 Most Cited Cases:**\n\n"
                     for i, (case, count) in enumerate(unique_cases, 1):
-                        result += f"{i}. {case.title()} - {count} citations\n"
-                    return result
-        
-        # For specific case citation queries, return clean list
-        if ("citations" in query_lower or "cited" in query_lower) and ("v." in query_lower or "vs" in query_lower):
-            try:
-                start = time.time()
-                cited = self.graph.get_cited_cases(query, 30)
-                if self.show_debug:
-                    print("Graph query time:", time.time() - start)
+                        answer += f"{i}. {case.title()} - {count} citations\n"
+                    return {
+                        "question": query,
+                        "answer": answer,
+                        "status": "success",
+                        "source_map": [],
+                        "precedent_chain": [],
+                        "groundedness_score": 1.0,
+                        "reflection_report": {},
+                        "debug_trace": debug_trace,
+                        "latency_seconds": round(time.time() - start_total, 3),
+                    }
             except Exception as e:
-                if self.show_debug:
-                    print("Graph query failed:", e)
-                cited = []
-            if cited:
-                # Deduplicate similar cases
-                unique_cited = self._deduplicate_cases(cited, max_results=15)
-                
-                if unique_cited:
-                    result = f"**Cases cited in {query}:**\n\n"
-                    for i, case in enumerate(unique_cited, 1):
-                        result += f"{i}. {case.title()}\n"
-                    result += self._build_case_source_block(query)
-                    return result
-        
-        # For general queries: retrieve context and use LLM
-        retrieval_query = query
+                log_step(f"graph stats failure: {type(e).__name__}: {e}")
+
+        # Step 4: Retrieval (expanded with graph context when available)
+        retrieval_query = canonicalize_legal_query(query)
         burden_keywords = ["burden of proof", "standard of proof", "beyond reasonable doubt"]
         if any(keyword in query_lower for keyword in burden_keywords):
             retrieval_query = (
@@ -270,14 +302,20 @@ class NyayaAgent:
                 "criminal trial presumption rebuttable evidence ordinance"
             )
 
+        if graph_context_lines:
+            retrieval_query = f"{retrieval_query} {' '.join(graph_context_lines)}"
+            log_step("retrieve: expanded query with graph-derived context")
+
         try:
             start = time.time()
             context_chunks = self.retriever.search(retrieval_query, top_k=3, return_metadata=True)
             if self.show_debug:
                 print("Retrieval time:", time.time() - start)
+            log_step(f"retrieve: got {len(context_chunks)} chunks")
         except Exception as e:
             if self.show_debug:
                 print("Vector retrieval failed:", e)
+            log_step(f"retrieve failure: {type(e).__name__}: {e}")
             context_chunks = []
         
         # Clean and filter chunks
@@ -288,9 +326,49 @@ class NyayaAgent:
             # Skip very short chunks, but allow longer ones for legal content
             if len(cleaned) > 50:
                 clean_chunks.append((cleaned, chunk))
+
+        # Null-result protocol: low-confidence retrieval must not be hallucinated into legal rules.
+        null_threshold = float(OPTIMIZED_SETTINGS.get("null_result_threshold", 0.35))
+        retrieval_confidences = []
+        for cleaned, chunk in clean_chunks:
+            if isinstance(chunk, dict):
+                score = chunk.get("retrieval_score")
+                if isinstance(score, (int, float)):
+                    retrieval_confidences.append(float(score))
+                    continue
+                relevance_score = score_result_relevance({"text": cleaned}, query)
+                retrieval_confidences.append(float(relevance_score))
+
+        if clean_chunks and retrieval_confidences and max(retrieval_confidences) < null_threshold:
+            return {
+                "question": query,
+                "answer": self._null_result_message(canonicalize_legal_query(query)),
+                "status": "insufficient_evidence",
+                "source_map": self._build_source_map("", [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]),
+                "precedent_chain": precedent_chain,
+                "groundedness_score": round(max(retrieval_confidences), 3),
+                "reflection_report": {
+                    "null_result_triggered": True,
+                    "max_retrieval_confidence": round(max(retrieval_confidences), 3),
+                    "threshold": null_threshold,
+                    "temporal_warnings": temporal_warnings,
+                },
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
         
         if not clean_chunks:
-            return "I couldn't find relevant information in the database for your query. Please try rephrasing your question or ask about a different legal topic."
+            return {
+                "question": query,
+                "answer": "I couldn't find relevant information in the database for your query. Please try rephrasing your question or ask about a different legal topic.",
+                "status": "no_context",
+                "source_map": [],
+                "precedent_chain": precedent_chain,
+                "groundedness_score": 0.0,
+                "reflection_report": {},
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
         
         # Limit total context to avoid overwhelming the model
         context_blocks = []
@@ -314,10 +392,21 @@ class NyayaAgent:
         self.last_llm_error = None
         
         # Build prompt for LLM - conversational ChatGPT-style
-        prompt = f"""You are Nyaya, a helpful Sri Lankan legal assistant. Answer questions naturally like ChatGPT, using the provided legal documents as your source.
+        prompt = f"""{SYSTEM_PROMPT}
+
+    Use this structured workflow:
+    1) Analyze the question and identify case names.
+    2) Prefer graph-derived legal context when case names are present.
+    3) Draft the answer using retrieved context only.
+    4) Avoid unsupported section/page references.
+
+    You are Nyaya, a helpful Sri Lankan legal assistant. Answer questions naturally like ChatGPT, using the provided legal documents as your source.
 
 **Context from case law:**
 {context_text}
+
+    **Graph Context:**
+    {chr(10).join(graph_context_lines) if graph_context_lines else 'No explicit graph context available.'}
 
 **Question:** {query}
 
@@ -352,6 +441,17 @@ Now answer the user's question naturally:"""
             
             # Use validated (potentially modified) answer
             answer = validated_answer
+
+            # Step 5: Self-correction reflection loop
+            reflection_answer, reflection_report = self.guardrails.reflection_self_check(
+                answer,
+                [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]
+            )
+            answer = reflection_answer
+            log_step(
+                "self-check: removed "
+                f"{reflection_report.get('removed_sentences', 0)} unsupported sentence(s)"
+            )
             
             # 🛡️ GUARDRAIL 3: Citation validation
             citations = self.citation_validator.extract_citations(answer)
@@ -368,6 +468,8 @@ Now answer the user's question naturally:"""
                 # Warn if low groundedness
                 if groundedness < 0.7 and len(citations) > 0:
                     answer += "\n\n⚠️ *Some citations may not be directly from the retrieved documents.*"
+            else:
+                groundedness = reflection_report.get("groundedness_score", 0.0)
             
             # Append manual citations if not already present
             if isinstance(clean_chunks[0][1], dict) and "(Source:" not in answer and "Page " not in answer:
@@ -388,9 +490,37 @@ Now answer the user's question naturally:"""
                             break
             
             # 🛡️ GUARDRAIL 4: Add legal disclaimer
+            if temporal_warnings:
+                answer = (
+                    "⚠️ High-priority temporal warning: one or more cited precedents may be "
+                    "overruled, overturned, or amended in the case graph.\n\n" + answer
+                )
             answer = self.guardrails.add_disclaimer(answer)
-            
-            return answer
+
+            chunks_dict = [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]
+            source_map = self._build_source_map(answer, chunks_dict)
+            if not precedent_chain:
+                try:
+                    precedent_chain = self._build_precedent_chain_for_query(query, case_name)
+                except Exception:
+                    precedent_chain = []
+
+            groundedness_value = 0.0
+            if isinstance(groundedness, (int, float)):
+                groundedness_value = float(groundedness)
+            reflection_report["temporal_warnings"] = temporal_warnings
+
+            return {
+                "question": query,
+                "answer": answer,
+                "status": "success",
+                "source_map": source_map,
+                "precedent_chain": precedent_chain,
+                "groundedness_score": round(groundedness_value, 3),
+                "reflection_report": reflection_report,
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
         except Exception as e:
             error_msg = str(e)
             if self.show_debug:
@@ -398,7 +528,7 @@ Now answer the user's question naturally:"""
             
             # Show helpful error if LLM not configured
             if "No LLM configured" in error_msg:
-                return """⚠️ **LLM Not Configured**
+                fallback = """⚠️ **LLM Not Configured**
 
 I can retrieve relevant documents, but I need an AI model (Azure OpenAI or Gemini) to generate natural answers.
 
@@ -411,5 +541,34 @@ Get free Gemini key: https://makersuite.google.com/app/apikey
 Meanwhile, here's what I found in the documents:
 
 """ + self._build_retrieval_fallback_answer(query, clean_chunks)
-            
-            return self._build_retrieval_fallback_answer(query, clean_chunks)
+                return {
+                    "question": query,
+                    "answer": fallback,
+                    "status": "fallback",
+                    "source_map": [],
+                    "precedent_chain": precedent_chain,
+                    "groundedness_score": 0.0,
+                    "reflection_report": {},
+                    "debug_trace": debug_trace,
+                    "latency_seconds": round(time.time() - start_total, 3),
+                }
+
+            fallback = self._build_retrieval_fallback_answer(query, clean_chunks)
+            return {
+                "question": query,
+                "answer": fallback,
+                "status": "fallback",
+                "source_map": [],
+                "precedent_chain": precedent_chain,
+                "groundedness_score": 0.0,
+                "reflection_report": {},
+                "debug_trace": debug_trace,
+                "latency_seconds": round(time.time() - start_total, 3),
+            }
+
+    def ask(self, query):
+        """
+        Backward-compatible plain answer API used by CLI/tests.
+        """
+        report = self.ask_with_report(query, debug_mode=False)
+        return report.get("answer", "")
