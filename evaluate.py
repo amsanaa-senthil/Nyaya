@@ -5,14 +5,17 @@ Measures: Recall@5, Citation Precision, Groundedness, Hallucination
 """
 
 import json
+import os
 import re
 import time
-from typing import List, Dict
+from datetime import datetime, timezone
+from typing import List, Dict, Any
 from agent.agno_agent import NyayaAgent
 from agent.retriever import HybridRetriever
 
 class NyayaEvaluator:
     def __init__(self, dataset_path: str = "evaluation_dataset.json"):
+        self.dataset_path = dataset_path
         self.agent = NyayaAgent(show_debug=False)
         self.retriever = HybridRetriever()
         
@@ -27,6 +30,10 @@ class NyayaEvaluator:
             "hallucinations": [],
             "failures": []
         }
+
+    @staticmethod
+    def _percent(value: float) -> str:
+        return f"{value * 100:.1f}%"
     
     def recall_at_5(self, query: str, ground_truth_pdf: str) -> bool:
         """Check if ground truth document appears in top-5 retrieved results"""
@@ -114,14 +121,19 @@ class NyayaEvaluator:
         
         # Get answer from system
         start_time = time.time()
+        failure = False
         try:
-            answer = self.agent.ask(question)
+            report = self.agent.ask_with_report(question, debug_mode=False)
+            answer = str(report.get("answer", ""))
+            status = str(report.get("status", "success"))
             elapsed = time.time() - start_time
         except Exception as e:
             print(f"  [ERROR] System failed: {e}")
+            failure = True
             return {
                 "question_id": question_id,
                 "status": "FAILED",
+                "category": category,
                 "error": str(e)
             }
         
@@ -130,11 +142,13 @@ class NyayaEvaluator:
             retrieved_chunks = self.retriever.search(question, top_k=5, return_metadata=True)
         except:
             retrieved_chunks = []
+
+        retrieved_chunks_dicts = [chunk for chunk in retrieved_chunks if isinstance(chunk, dict)]
         
         # Compute metrics
         recall = self.recall_at_5(question, expected_pdf)
-        precision = self.citation_precision(answer, retrieved_chunks)
-        groundedness = self.answer_groundedness(answer, retrieved_chunks)
+        precision = self.citation_precision(answer, retrieved_chunks_dicts)
+        groundedness = self.answer_groundedness(answer, retrieved_chunks_dicts)
         
         page_correct = False
         if "expected_page" in test_case:
@@ -143,12 +157,14 @@ class NyayaEvaluator:
         result = {
             "question_id": question_id,
             "category": category,
-            "status": "PASSED" if recall else "FAILED",
+            "status": "PASSED" if recall and not failure else "FAILED",
+            "agent_status": status,
             "recall_at_5": recall,
             "citation_precision": round(precision, 3),
             "answer_groundedness": round(groundedness, 3),
             "page_accuracy": page_correct if "expected_page" in test_case else None,
             "latency_seconds": round(elapsed, 2),
+            "failure": failure or status in {"fallback", "blocked"},
             "answer_snippet": answer[:150] + "..." if len(answer) > 150 else answer
         }
         
@@ -163,7 +179,7 @@ class NyayaEvaluator:
         
         return result
     
-    def run_full_evaluation(self) -> Dict:
+    def run_full_evaluation(self) -> Dict[str, Any]:
         """Run all tests and generate report"""
         print("\n" + "="*70)
         print("🔍 NYAYA SYSTEM ACADEMIC EVALUATION")
@@ -185,19 +201,65 @@ class NyayaEvaluator:
         ground_vals = [r["answer_groundedness"] for r in valid_results if isinstance(r.get("answer_groundedness"), (int, float))]
         ground_avg = sum(ground_vals) / len(ground_vals) if ground_vals else 0
         avg_latency = sum(r["latency_seconds"] for r in valid_results if isinstance(r.get("latency_seconds"), (int, float))) / len([r for r in valid_results if isinstance(r.get("latency_seconds"), (int, float))]) if valid_results else 0
+        failure_rate = sum(1 for r in valid_results if r.get("failure") is True) / len(valid_results) if valid_results else 0
+
+        by_category: Dict[str, Dict[str, Any]] = {}
+        for item in valid_results:
+            category = item.get("category", "uncategorized")
+            by_category.setdefault(category, {
+                "count": 0,
+                "recall_at_5": 0.0,
+                "citation_precision": 0.0,
+                "answer_groundedness": 0.0,
+                "avg_latency_seconds": 0.0,
+                "failure_rate": 0.0,
+            })
+            by_category[category]["count"] += 1
+            by_category[category]["recall_at_5"] += 1.0 if item.get("recall_at_5") else 0.0
+            by_category[category]["citation_precision"] += float(item.get("citation_precision", 0.0) or 0.0)
+            by_category[category]["answer_groundedness"] += float(item.get("answer_groundedness", 0.0) or 0.0)
+            by_category[category]["avg_latency_seconds"] += float(item.get("latency_seconds", 0.0) or 0.0)
+            by_category[category]["failure_rate"] += 1.0 if item.get("failure") else 0.0
+
+        for category, values in by_category.items():
+            count = max(int(values["count"]), 1)
+            values["recall_at_5"] = round(values["recall_at_5"] / count, 4)
+            values["citation_precision"] = round(values["citation_precision"] / count, 4)
+            values["answer_groundedness"] = round(values["answer_groundedness"] / count, 4)
+            values["avg_latency_seconds"] = round(values["avg_latency_seconds"] / count, 4)
+            values["failure_rate"] = round(values["failure_rate"] / count, 4)
+
+        # Basic data-driven threshold tuning suggestions.
+        suggested_null_threshold = round(max(0.2, min(0.6, 0.3 + (failure_rate * 0.2))), 3)
+        suggested_recency_weight = round(max(0.05, min(0.3, 0.1 + ((1.0 - recall_at_5_avg) * 0.1))), 3)
         
         # Generate report
         report = {
             "evaluation_type": "Academic Grade Evaluation",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "dataset_path": self.dataset_path,
             "total_tests": len(valid_results),
             "passed": passed,
             "failed": len(valid_results) - passed,
             "pass_rate": f"{(passed / len(valid_results)) * 100:.1f}%" if valid_results else "N/A",
             "metrics": {
-                "recall_at_5": f"{recall_at_5_avg * 100:.1f}%",
-                "citation_precision": f"{cite_prec_avg * 100:.1f}%",
-                "answer_groundedness": f"{ground_avg * 100:.1f}%",
-                "avg_latency_seconds": round(avg_latency, 2)
+                "recall_at_5": self._percent(recall_at_5_avg),
+                "citation_precision": self._percent(cite_prec_avg),
+                "answer_groundedness": self._percent(ground_avg),
+                "avg_latency_seconds": round(avg_latency, 2),
+                "failure_rate": self._percent(failure_rate),
+            },
+            "metrics_raw": {
+                "recall_at_5": round(recall_at_5_avg, 4),
+                "citation_precision": round(cite_prec_avg, 4),
+                "answer_groundedness": round(ground_avg, 4),
+                "avg_latency_seconds": round(avg_latency, 4),
+                "failure_rate": round(failure_rate, 4),
+            },
+            "by_category": by_category,
+            "threshold_calibration": {
+                "suggested_null_result_threshold": suggested_null_threshold,
+                "suggested_recency_weight": suggested_recency_weight,
             },
             "detailed_results": all_results
         }
@@ -214,6 +276,7 @@ class NyayaEvaluator:
         print(f"  • Citation Precision: {report['metrics']['citation_precision']}")
         print(f"  • Answer Groundedness: {report['metrics']['answer_groundedness']}")
         print(f"  • Avg Latency: {report['metrics']['avg_latency_seconds']}s")
+        print(f"  • Failure Rate: {report['metrics']['failure_rate']}")
         
         return report
     
@@ -225,6 +288,12 @@ class NyayaEvaluator:
         print(f"\n✓ Results saved to {output_file}")
         return report
 
+    def save_timestamped_results(self, output_dir: str = "evaluation_reports") -> Dict[str, Any]:
+        os.makedirs(output_dir, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        output_file = os.path.join(output_dir, f"evaluation_results_{stamp}.json")
+        return self.save_results(output_file)
+
 if __name__ == "__main__":
     evaluator = NyayaEvaluator()
-    evaluator.save_results()
+    evaluator.save_timestamped_results()
