@@ -18,6 +18,9 @@ evaluation_dataset.json
 evaluation_results.json
 optimization_results.json
 TEST_QUESTIONS.md
+evaluation_reports/
+PROJECT_SUMMARY.md
+OPEN_SOURCE_DEPENDENCIES.md
 
 # Cache files
 .query_cache/

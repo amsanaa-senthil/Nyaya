@@ -12,6 +12,7 @@ from threading import Lock
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -28,6 +29,16 @@ app = FastAPI(
     title="Nyaya Legal Assistant API",
     description="Sri Lankan Legal Question Answering System",
     version="1.0.0"
+)
+
+# CORS — allow the frontend to call this API from any origin (dev + prod)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       # tighten to your frontend URL in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
 
 _agent_lock = Lock()
