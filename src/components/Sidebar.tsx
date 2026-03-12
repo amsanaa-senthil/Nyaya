@@ -202,13 +202,7 @@ export default function Sidebar({
                 ))}
             </div>
 
-            {/* User Profile / Footer */}
-            <div className="p-4 border-t border-navy-800">
-                <div className="flex items-center gap-3 px-2">
-                    <div className="w-8 h-8 rounded-full bg-gold-500 flex items-center justify-center text-navy-900 font-bold text-xs">U</div>
 
-                </div>
-            </div>
 
             {/* Drag Handle */}
             <div
