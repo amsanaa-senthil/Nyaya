@@ -182,7 +182,7 @@ export default function QuizSystemPage() {
                 </div>
 
                 {/* Navbar */}
-                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-gray-50/80 to-transparent backdrop-blur-[2px]">
+                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                         <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
@@ -234,7 +234,7 @@ export default function QuizSystemPage() {
         return (
             <div className="min-h-screen bg-gray-50/20 flex flex-col items-center justify-center p-6 pb-20 relative font-sans">
                 {/* Navbar */}
-                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-gray-50/80 to-transparent backdrop-blur-[2px]">
+                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                         <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
@@ -277,7 +277,7 @@ export default function QuizSystemPage() {
             </div>
 
             {/* Navbar */}
-            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-gray-50/80 to-transparent backdrop-blur-[2px]">
+            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
                 <div className="flex items-center gap-2.5">
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                     <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
