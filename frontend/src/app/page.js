@@ -34,6 +34,17 @@ export default async function Home() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-3 text-center">{quiz.title}</h2>
               <p className="text-gray-600 text-sm mb-4 text-center line-clamp-2">{quiz.description}</p>
+              {quiz.difficulty && (
+                <div className="flex justify-center mb-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    quiz.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                    quiz.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {quiz.difficulty}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                 <span className="text-sm text-gray-500">{quiz.question_count} questions</span>
                 <span className="text-indigo-600 font-semibold">Start →</span>

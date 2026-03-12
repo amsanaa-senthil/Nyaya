@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS quizzes2 (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     description TEXT,
+    difficulty VARCHAR(50) CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -41,7 +41,7 @@ def get_all_quizzes():
     try:
         # Fetch all quizzes
         quizzes_result = db.execute(text("""
-            SELECT id, title, description, created_at
+            SELECT id, title, description, difficulty, created_at
             FROM quizzes2
             ORDER BY created_at DESC
         """)).mappings().all()
@@ -95,7 +95,7 @@ def get_quiz(quiz_id: str):
     try:
         # Fetch quiz
         quiz_result = db.execute(text("""
-            SELECT id, title, description, created_at
+            SELECT id, title, description, difficulty, created_at
             FROM quizzes2
             WHERE id = :id
         """), {"id": quiz_id}).mappings().first()
