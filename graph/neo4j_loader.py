@@ -36,7 +36,8 @@ def extract_metadata_from_text(text):
         "court": None,
         "citation": None,
         "stage": None,
-        "volume": None
+        "volume": None,
+        "status": "Unknown",
     }
     
     # Extract year (4-digit numbers between 1900-2099)
@@ -79,6 +80,15 @@ def extract_metadata_from_text(text):
     citation_match = re.search(r'(\d{1,3}\s+(?:NLR|SLR|LR)\s+\d{1,4})', text)
     if citation_match:
         metadata["citation"] = citation_match.group(1)  # type: ignore
+
+    # Heuristic case status extraction for temporal validation.
+    lowered = text.lower()
+    if re.search(r'\boverruled\b|\boverturned\b|\breversed\b', lowered):
+        metadata["status"] = "Overruled"
+    elif re.search(r'\bamended\b|\bmodified\b', lowered):
+        metadata["status"] = "Amended"
+    elif re.search(r'\bupheld\b|\baffirmed\b', lowered):
+        metadata["status"] = "Active"
     
     return metadata
 
@@ -334,14 +344,16 @@ def create_case_node(title, text=None):
                         c.court = COALESCE(c.court, $court),
                         c.citation = COALESCE(c.citation, $citation),
                         c.stage = COALESCE(c.stage, $stage),
-                        c.volume = COALESCE(c.volume, $volume)
+                        c.volume = COALESCE(c.volume, $volume),
+                        c.status = COALESCE(c.status, $status)
                 """, 
                 title=normalized,
                 year=metadata.get("year"),
                 court=metadata.get("court"),
                 citation=metadata.get("citation"),
                 stage=metadata.get("stage"),
-                volume=metadata.get("volume")
+                volume=metadata.get("volume"),
+                status=metadata.get("status")
                 )
             break  # success
         except ServiceUnavailable:
