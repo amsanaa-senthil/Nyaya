@@ -1,35 +1,44 @@
+"""Manual smoke helper for hybrid retrieval.
+
+This file is intentionally non-automated so CI test runs are deterministic and
+do not call external model providers.
 """
-Test script for hybrid retrieval (Phase 4)
-"""
+
 from agent.agno_agent import NyayaAgent
 from dotenv import load_dotenv
 
-load_dotenv()
 
-# Initialize agent with hybrid retriever
-print("\n" + "="*60)
-print("PHASE 4: HYBRID RETRIEVAL TEST")
-print("="*60 + "\n")
+def run_manual_hybrid_smoke() -> None:
+    load_dotenv()
+    print("\n" + "=" * 60)
+    print("PHASE 4: HYBRID RETRIEVAL TEST")
+    print("=" * 60 + "\n")
 
-agent = NyayaAgent()
+    agent = NyayaAgent()
+    test_queries = [
+        "Suez Canal Company case",
+        "most cited cases in Indian constitution",
+        "fundamental rights article 21",
+    ]
 
-# Test queries with legal terminology
-test_queries = [
-    "Suez Canal Company case",
-    "most cited cases in Indian constitution",
-    "fundamental rights article 21",
-]
+    for query in test_queries:
+        print(f"\n[QUERY] '{query}'")
+        print("-" * 60)
+        try:
+            response = agent.ask(query)
+            print(f"Response:\n{response}\n")
+        except Exception as exc:
+            print(f"Error: {exc}\n")
 
-for query in test_queries:
-    print(f"\n[QUERY] '{query}'")
-    print("-" * 60)
-    
-    try:
-        response = agent.ask(query)
-        print(f"Response:\n{response}\n")
-    except Exception as e:
-        print(f"⚠ Error: {e}\n")
+    print("\n" + "=" * 60)
+    print("Test completed!")
+    print("=" * 60)
 
-print("\n" + "="*60)
-print("Test completed!")
-print("="*60)
+
+def test_hybrid_smoke_placeholder():
+    # Keeps pytest discovery healthy while avoiding external calls.
+    assert True
+
+
+if __name__ == "__main__":
+    run_manual_hybrid_smoke()
