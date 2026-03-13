@@ -1,5 +1,6 @@
 import re
 import time
+import os
 from typing import Dict, List, Optional
 from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
@@ -13,10 +14,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _is_truthy_env(name: str, default: str = "1") -> bool:
+    value = os.getenv(name, default)
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
 class NyayaAgent:
     def __init__(self, show_debug=False):
         # Initialize graph and retriever
-        self.graph = CitationGraph()
+        self.graph = None
+        if not _is_truthy_env("NYAYA_DISABLE_GRAPH", "0"):
+            try:
+                self.graph = CitationGraph()
+            except Exception as error:
+                if show_debug:
+                    print(f"[WARNING] Graph disabled due to init failure: {error}")
         self.show_debug = show_debug  # Suppress debug output for end users
         
         # Initialize guardrails
@@ -195,6 +207,9 @@ class NyayaAgent:
         )
 
     def _build_precedent_chain_for_query(self, query: str, case_name: Optional[str]) -> List[Dict]:
+        if not self.graph:
+            return []
+
         if case_name:
             return self.graph.get_top_related_precedents(case_name, limit=3)
 
@@ -251,7 +266,7 @@ class NyayaAgent:
         graph_context_lines = []
         precedent_chain = []
         temporal_warnings = []
-        if case_name:
+        if case_name and self.graph:
             log_step(f"analyze: detected case name '{case_name}', running graph-first traversal")
             try:
                 cited_by = self.graph.get_precedent_history(case_name, limit=10)
@@ -270,7 +285,7 @@ class NyayaAgent:
                     graph_context_lines.append(f"Temporal warning: potentially weakened precedents found: {warning_cases}")
             except Exception as e:
                 log_step(f"graph failure: {type(e).__name__}: {e}")
-        elif "most cited" in query_lower or "top cited" in query_lower:
+        elif self.graph and ("most cited" in query_lower or "top cited" in query_lower):
             log_step("analyze: graph statistics query detected")
             try:
                 top = self.graph.get_most_cited(50)
@@ -495,7 +510,8 @@ Now answer the user's question naturally:"""
                     "⚠️ High-priority temporal warning: one or more cited precedents may be "
                     "overruled, overturned, or amended in the case graph.\n\n" + answer
                 )
-            answer = self.guardrails.add_disclaimer(answer)
+            if _is_truthy_env("NYAYA_APPEND_DISCLAIMER", "1"):
+                answer = self.guardrails.add_disclaimer(answer)
 
             chunks_dict = [chunk for _, chunk in clean_chunks if isinstance(chunk, dict)]
             source_map = self._build_source_map(answer, chunks_dict)
