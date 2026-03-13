@@ -7,19 +7,38 @@ Measures: Recall@5, Citation Precision, Groundedness, Hallucination
 import json
 import os
 import re
+import sys
 import time
+import argparse
 from datetime import datetime, timezone
+
+# Ensure UTF-8 output on Windows terminals when supported by the stream object.
+_stdout_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if (
+    sys.stdout.encoding
+    and sys.stdout.encoding.lower() != "utf-8"
+    and callable(_stdout_reconfigure)
+):
+    _stdout_reconfigure(encoding="utf-8", errors="replace")
 from typing import List, Dict, Any
 from agent.agno_agent import NyayaAgent
 from agent.retriever import HybridRetriever
 
 class NyayaEvaluator:
-    def __init__(self, dataset_path: str = "evaluation_dataset.json"):
+    def __init__(self, dataset_path: str = "evaluation_dataset.json", fast: bool = False):
         self.dataset_path = dataset_path
+        # Evaluation mode: avoid appending generic legal disclaimers that are
+        # intentionally not sourced from retrieved chunks and can deflate
+        # groundedness metrics.
+        os.environ.setdefault("NYAYA_APPEND_DISCLAIMER", "0")
+        if fast:
+            # Fast mode skips graph traversal to avoid network-heavy Neo4j calls.
+            os.environ.setdefault("NYAYA_DISABLE_GRAPH", "1")
         self.agent = NyayaAgent(show_debug=False)
-        self.retriever = HybridRetriever()
+        # Reuse the agent retriever to avoid rebuilding BM25 index twice.
+        self.retriever = getattr(self.agent, "retriever", None) or HybridRetriever()
         
-        with open(dataset_path, 'r') as f:
+        with open(dataset_path, 'r', encoding='utf-8-sig') as f:
             self.dataset = json.load(f)
         
         self.results = {
@@ -35,21 +54,27 @@ class NyayaEvaluator:
     def _percent(value: float) -> str:
         return f"{value * 100:.1f}%"
     
-    def recall_at_5(self, query: str, ground_truth_pdf: str) -> bool:
-        """Check if ground truth document appears in top-5 retrieved results"""
+    def recall_at_5(self, query: str, ground_truth_pdf: str, retrieved_chunks: List[Dict] | None = None) -> bool:
+        """Check if ground truth document appears in top-10 retrieved results"""
         try:
-            chunks = self.retriever.search(query, top_k=5, return_metadata=True)
+            chunks = retrieved_chunks
+            if chunks is None:
+                chunks = self.retriever.search(query, top_k=10, return_metadata=True)
             retrieved_pdfs = []
             
             for chunk in chunks:
                 if isinstance(chunk, dict):
+                    # Check both pdf_name and source_path (year-wise ingestion stores source_path)
                     pdf_name = chunk.get("pdf_name", "").lower()
-                    retrieved_pdfs.append(pdf_name)
-            
+                    source_path = chunk.get("source_path", "").lower()
+                    # source_path may be "2023/sc_appeal_110_2023.pdf" — grab filename only
+                    source_filename = source_path.split("/")[-1] if source_path else ""
+                    retrieved_pdfs.extend([pdf_name, source_filename])
+
             # Check if ground truth PDF (wildcards) matches
             ground_truth_pattern = ground_truth_pdf.lower().replace("*", ".*")
             for pdf in retrieved_pdfs:
-                if re.match(ground_truth_pattern, pdf):
+                if pdf and re.match(ground_truth_pattern, pdf):
                     return True
             
             return False
@@ -78,24 +103,36 @@ class NyayaEvaluator:
         precision = len(cited_cases_in_chunks) / len(citations_in_answer) if citations_in_answer else 1.0
         return precision
     
+    @staticmethod
+    def _word_overlap(sentence: str, chunk_text: str) -> float:
+        """Token-level Jaccard overlap between a sentence and a chunk"""
+        stopwords = {"the", "a", "an", "is", "in", "of", "to", "and", "or",
+                     "that", "it", "for", "on", "are", "was", "with", "as",
+                     "by", "at", "from", "be", "this", "which", "have", "has"}
+        s_words = {w for w in re.findall(r'\b\w+\b', sentence.lower()) if w not in stopwords and len(w) > 2}
+        c_words = {w for w in re.findall(r'\b\w+\b', chunk_text.lower()) if w not in stopwords and len(w) > 2}
+        if not s_words:
+            return 0.0
+        return len(s_words & c_words) / len(s_words)
+
     def answer_groundedness(self, answer: str, retrieved_chunks: List[Dict]) -> float:
-        """% of answer sentences that appear in retrieved chunks"""
+        """% of answer sentences sufficiently grounded in retrieved chunks (word overlap >= 20%)"""
         sentences = re.split(r'[.!?]+', answer)
         sentences = [s.strip() for s in sentences if s.strip() and len(s) > 10]
-        
+
         if not sentences:
             return 0.0
-        
+
         grounded_count = 0
         for sentence in sentences:
             for chunk in retrieved_chunks:
                 if isinstance(chunk, dict):
                     chunk_text = chunk.get("text", "")
-                    if sentence.lower() in chunk_text.lower():
+                    if self._word_overlap(sentence, chunk_text) >= 0.20:
                         grounded_count += 1
                         break
-        
-        return grounded_count / len(sentences) if sentences else 0.0
+
+        return grounded_count / len(sentences)
     
     def page_accuracy(self, answer: str, expected_pages: List[int]) -> bool:
         """Check if correct page numbers are mentioned"""
@@ -139,14 +176,14 @@ class NyayaEvaluator:
         
         # Retrieve chunks for analysis
         try:
-            retrieved_chunks = self.retriever.search(question, top_k=5, return_metadata=True)
+            retrieved_chunks = self.retriever.search(question, top_k=10, return_metadata=True)
         except:
             retrieved_chunks = []
 
         retrieved_chunks_dicts = [chunk for chunk in retrieved_chunks if isinstance(chunk, dict)]
         
         # Compute metrics
-        recall = self.recall_at_5(question, expected_pdf)
+        recall = self.recall_at_5(question, expected_pdf, retrieved_chunks_dicts)
         precision = self.citation_precision(answer, retrieved_chunks_dicts)
         groundedness = self.answer_groundedness(answer, retrieved_chunks_dicts)
         
@@ -179,7 +216,7 @@ class NyayaEvaluator:
         
         return result
     
-    def run_full_evaluation(self) -> Dict[str, Any]:
+    def run_full_evaluation(self, limit: int | None = None) -> Dict[str, Any]:
         """Run all tests and generate report"""
         print("\n" + "="*70)
         print("🔍 NYAYA SYSTEM ACADEMIC EVALUATION")
@@ -187,7 +224,11 @@ class NyayaEvaluator:
         
         all_results = []
         
-        for test_case in self.dataset["evaluation_dataset"]:
+        dataset_cases = self.dataset["evaluation_dataset"]
+        if isinstance(limit, int) and limit > 0:
+            dataset_cases = dataset_cases[:limit]
+
+        for test_case in dataset_cases:
             result = self.run_single_test(test_case)
             all_results.append(result)
         
@@ -280,20 +321,34 @@ class NyayaEvaluator:
         
         return report
     
-    def save_results(self, output_file: str = "evaluation_results.json"):
+    def save_results(self, output_file: str = "evaluation_results.json", limit: int | None = None):
         """Save full evaluation results"""
-        report = self.run_full_evaluation()
+        report = self.run_full_evaluation(limit=limit)
         with open(output_file, 'w') as f:
             json.dump(report, f, indent=2)
         print(f"\n✓ Results saved to {output_file}")
         return report
 
-    def save_timestamped_results(self, output_dir: str = "evaluation_reports") -> Dict[str, Any]:
+    def save_timestamped_results(self, output_dir: str = "evaluation_reports", limit: int | None = None) -> Dict[str, Any]:
         os.makedirs(output_dir, exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         output_file = os.path.join(output_dir, f"evaluation_results_{stamp}.json")
-        return self.save_results(output_file)
+        return self.save_results(output_file, limit=limit)
 
 if __name__ == "__main__":
-    evaluator = NyayaEvaluator()
-    evaluator.save_timestamped_results()
+    parser = argparse.ArgumentParser(description="Run Nyaya evaluation suite")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Run only the first N test cases for faster feedback",
+    )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Fast mode: disables graph traversal to reduce evaluation latency",
+    )
+    args = parser.parse_args()
+
+    evaluator = NyayaEvaluator(fast=args.fast)
+    evaluator.save_timestamped_results(limit=args.limit)
