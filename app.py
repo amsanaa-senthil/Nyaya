@@ -6,6 +6,7 @@ Provides HTTP endpoints for legal question answering and case lookup.
 
 import json
 import logging
+import os
 import time
 import uuid
 from threading import Lock
@@ -31,11 +32,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS — allow the frontend to call this API from any origin (dev + prod)
+# CORS — set CORS_ORIGINS in .env as a comma-separated list of allowed frontend
+# URLs (e.g. https://your-app.vercel.app,http://localhost:3000).
+# Defaults to "*" only when the env var is absent (local dev).
+_raw_cors = os.getenv("CORS_ORIGINS", "")
+_cors_origins: list[str] = (
+    [o.strip() for o in _raw_cors.split(",") if o.strip()]
+    if _raw_cors.strip()
+    else ["*"]
+)
+# allow_credentials must be False when origins includes "*" (browser restriction)
+_allow_credentials = "*" not in _cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # tighten to your frontend URL in production
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["X-Request-ID"],
