@@ -12,11 +12,11 @@ import hashlib
 import uuid
 
 
-def _stable_point_id(pdf_name, page, section, text):
+def _stable_point_id(source_key, page, section, text):
     """Generate a stable UUID from chunk metadata.
     Qdrant requires point IDs to be either unsigned integers or UUIDs.
     """
-    key = f"{pdf_name}|{page}|{section}|{text}".encode("utf-8", errors="ignore")
+    key = f"{source_key}|{page}|{section}|{text}".encode("utf-8", errors="ignore")
     # Use SHA1 hash to seed UUID5 (deterministic UUID generation)
     hash_obj = hashlib.sha1(key)
     # Create UUID 5 (SHA1-based) using the hash as namespace
@@ -24,21 +24,33 @@ def _stable_point_id(pdf_name, page, section, text):
 
 
 def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
-    client = create_qdrant_client(timeout_seconds=600)
+    try:
+        client = create_qdrant_client(timeout_seconds=600)
+    except Exception as exc:
+        print(f"[ERROR] Could not create Qdrant client for {pdf_name}: {exc}")
+        return False
 
     collection_name = QDRANT_COLLECTION
 
     # Create collection if it does not exist (avoid wiping previous data)
     try:
         client.get_collection(collection_name)
-    except Exception:
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(
-                size=len(embeddings[0]),
-                distance=Distance.COSINE
+    except Exception as get_exc:
+        try:
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=len(embeddings[0]),
+                    distance=Distance.COSINE
+                )
             )
-        )
+        except Exception as create_exc:
+            print(
+                f"[ERROR] Qdrant unavailable while preparing collection '{collection_name}' "
+                f"for {pdf_name}: {create_exc}"
+            )
+            print(f"[INFO] Underlying collection check error: {get_exc}")
+            return False
 
     if replace_pdf:
         # Note: Cannot delete by pdf_name filter without payload index.
@@ -64,6 +76,8 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
             payload = {
                 "text": chunk.get("text", ""),
                 "pdf_name": chunk.get("pdf_name", pdf_name),
+                "source_path": chunk.get("source_path", pdf_name),
+                "year_folder": chunk.get("year_folder"),
                 "page": page_value,
                 "section": section_value,
                 "line_start": chunk.get("line_start"),
@@ -73,6 +87,8 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
             payload = {
                 "text": chunk,
                 "pdf_name": pdf_name,
+                "source_path": pdf_name,
+                "year_folder": None,
                 "page": -1,
                 "section": "Unknown",
             }
@@ -80,7 +96,7 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
         points.append(
             PointStruct(
                 id=_stable_point_id(
-                    payload.get("pdf_name", pdf_name),
+                    payload.get("source_path") or payload.get("pdf_name", pdf_name),
                     payload.get("page", -1),
                     payload.get("section", "Unknown"),
                     payload.get("text", ""),
@@ -134,7 +150,8 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
             stored_count = len(points) - (len(failed_batches) * batch_size)
             print(f"[WARNING] {pdf_name}: {len(failed_batches)} batch(es) failed")
             print(f"[INFO] Partial upload: {stored_count}/{len(points)} points stored (acceptable for incremental indexing)")
+            return False
         else:
             print(f"[OK] Stored {len(points)} vectors for {pdf_name}")
 
-    return client
+    return True
