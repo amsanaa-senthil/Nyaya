@@ -18,6 +18,9 @@ from common_utils import clean_text, create_qdrant_client
 from resilience import CircuitBreaker, call_with_retry
 
 
+SC_ONLY_MODE = os.getenv("RETRIEVER_SC_ONLY", "1").strip().lower() not in {"0", "false", "no"}
+
+
 def _safe_year(value):
     try:
         year = int(value)
@@ -36,6 +39,24 @@ def _recency_bonus(year, current_year=2026):
     return 1.0 / (1.0 + (age / 10.0))
 
 
+def _is_sc_pdf(pdf_name: str | None) -> bool:
+    return bool(pdf_name and str(pdf_name).lower().startswith("sc_"))
+
+
+def _is_sc_doc(payload_or_doc: dict | None) -> bool:
+    """
+    Detect whether a record belongs to the SC corpus.
+    Works for both Qdrant payloads and enriched retriever docs.
+    """
+    if not isinstance(payload_or_doc, dict):
+        return False
+
+    pdf_name = str(payload_or_doc.get("pdf_name") or payload_or_doc.get("pdf") or "").strip().lower()
+    source_path = str(payload_or_doc.get("source_path") or "").strip().lower()
+    source_filename = source_path.replace("\\", "/").split("/")[-1] if source_path else ""
+    return _is_sc_pdf(pdf_name) or _is_sc_pdf(source_filename)
+
+
 def _enrich_points(points, return_metadata=True):
     """
     Helper: Convert Qdrant points to enriched result format.
@@ -50,6 +71,7 @@ def _enrich_points(points, return_metadata=True):
         enriched.append({
             "text": clean_text(payload.get("text", "")),
             "pdf_name": payload.get("pdf_name") or payload.get("pdf"),
+            "source_path": payload.get("source_path"),
             "page": payload.get("page"),
             "section": payload.get("section", "Unknown"),
             "line_start": payload.get("line_start"),
@@ -149,7 +171,11 @@ class HybridRetriever:
             
             # Extract text and tokenize for BM25
             for point in all_docs[0]:
-                text = (point.payload or {}).get("text", "")
+                payload = point.payload or {}
+                if SC_ONLY_MODE and not _is_sc_doc(payload):
+                    continue
+
+                text = payload.get("text", "")
                 cleaned = clean_text(text)
                 if len(cleaned) > 20:  # Skip very short docs
                     # Tokenize: split by whitespace and lowercase
@@ -158,7 +184,7 @@ class HybridRetriever:
                     self.documents.append({
                         "text": cleaned,
                         "id": point.id,
-                        "payload": point.payload or {}
+                        "payload": payload
                     })
             
             # Build BM25 model
@@ -197,6 +223,12 @@ class HybridRetriever:
         if OPTIMIZED_SETTINGS.get("cache_enabled"):
             cached = get_cached_query_result(query)
             if cached:
+                if SC_ONLY_MODE:
+                    cached = [doc for doc in cached if _is_sc_doc(doc)]
+                # If cache is stale/insufficient after filtering, continue with live retrieval.
+                if len(cached) < max(1, top_k):
+                    cached = None
+            if cached:
                 # Debug: print(f"[CACHE HIT] Retrieved cached results for query")
                 if return_metadata:
                     return cached[:top_k]
@@ -204,6 +236,8 @@ class HybridRetriever:
         
         # Get vector search results (always available)
         vector_results = self.vector_retriever.search(query, top_k=top_k*2, return_metadata=True)
+        if SC_ONLY_MODE:
+            vector_results = [doc for doc in vector_results if isinstance(doc, dict) and _is_sc_doc(doc)]
         
         # Get BM25 scores (fallback to vector-only if BM25 failed)
         bm25_scores = {}
@@ -262,6 +296,7 @@ class HybridRetriever:
                             "doc": {
                                 "text": doc["text"],
                                 "pdf_name": doc["payload"].get("pdf_name", "Unknown"),
+                                "source_path": doc["payload"].get("source_path"),
                                 "page": doc["payload"].get("page", "Unknown"),
                                 "section": doc["payload"].get("section", "Unknown"),
                                 "line_start": doc["payload"].get("line_start"),
