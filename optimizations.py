@@ -238,6 +238,6 @@ OPTIMIZED_SETTINGS = {
     "bm25_weight": 0.4,         # 40% keyword (good for cases)
     "parallel_workers": 4,      # For embedding generation
     "cache_enabled": True,      # Enable query caching
-    "null_result_threshold": 0.307,
+    "null_result_threshold": 0.18,  # Match result_threshold; avoids premature null-refusal
     "recency_weight": 0.103,
 }
