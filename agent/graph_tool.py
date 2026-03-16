@@ -1,11 +1,15 @@
 from neo4j import GraphDatabase
+import logging
 import os
 from dotenv import load_dotenv
 from graph.neo4j_loader import normalize_title
 from resilience import CircuitBreaker, call_with_retry
 
+# Suppress noisy bolt-protocol connection error logs from the Neo4j driver.
+# Python exceptions from failed queries are already caught and handled gracefully.
+logging.getLogger("neo4j").setLevel(logging.CRITICAL)
+logging.getLogger("neo4j.debug").setLevel(logging.CRITICAL)
 
-# 🔥 ADD THIS
 load_dotenv()
 
 
