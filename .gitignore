@@ -26,6 +26,10 @@ OPEN_SOURCE_DEPENDENCIES.md
 .query_cache/
 .bm25_index.pkl
 .index_state.json
+.bm25_cache/
+nyaya_analytics.db
+pytest_out.txt
+requirements.optional-training.txt
 
 # Development/testing scripts (not needed in production)
 check_metadata.py
