@@ -21,7 +21,7 @@ if (
 ):
     _stdout_reconfigure(encoding="utf-8", errors="replace")
 from typing import List, Dict, Any
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
 from agent.retriever import HybridRetriever
 
 class NyayaEvaluator:
@@ -312,7 +312,7 @@ class NyayaEvaluator:
         print(f"Total Tests: {report['total_tests']}")
         print(f"Passed: {report['passed']} | Failed: {report['failed']}")
         print(f"Pass Rate: {report['pass_rate']}")
-        print(f"\n📈 Key Metrics:")
+        print("\n📈 Key Metrics:")
         print(f"  • Recall@5: {report['metrics']['recall_at_5']}")
         print(f"  • Citation Precision: {report['metrics']['citation_precision']}")
         print(f"  • Answer Groundedness: {report['metrics']['answer_groundedness']}")
