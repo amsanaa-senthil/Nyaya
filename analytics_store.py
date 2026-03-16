@@ -1,12 +1,32 @@
 """
-In-memory analytics aggregation for API quality trends.
+Analytics aggregation with SQLite persistence.
+Events are written to nyaya_analytics.db so data survives server restarts.
 """
 
+import os
+import sqlite3
 from collections import deque
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any, Dict, Deque, List
 import time
+
+_DB_PATH = os.getenv("NYAYA_ANALYTICS_DB", "nyaya_analytics.db")
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp     REAL    NOT NULL,
+    request_id    TEXT    NOT NULL,
+    endpoint      TEXT    NOT NULL,
+    status        TEXT    NOT NULL,
+    groundedness_score REAL NOT NULL DEFAULT 0.0,
+    latency_seconds    REAL NOT NULL DEFAULT 0.0,
+    fallback_used INTEGER NOT NULL DEFAULT 0,
+    no_context    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ae_timestamp ON analytics_events(timestamp);
+"""
 
 
 @dataclass
@@ -24,12 +44,51 @@ class AnalyticsEvent:
 class AnalyticsStore:
     def __init__(self, max_events: int = 5000):
         self.max_events = max_events
+        # In-memory mirror for fast reads
         self._events: Deque[AnalyticsEvent] = deque(maxlen=max_events)
         self._lock = Lock()
+        self._db_path = _DB_PATH
+        self._init_db()
+
+    def _init_db(self) -> None:
+        """Create table if it doesn't exist and load recent events into memory."""
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.executescript(_SCHEMA)
+                conn.commit()
+                rows = conn.execute(
+                    "SELECT timestamp, request_id, endpoint, status, "
+                    "groundedness_score, latency_seconds, fallback_used, no_context "
+                    "FROM analytics_events ORDER BY id DESC LIMIT ?",
+                    (self.max_events,),
+                ).fetchall()
+            for row in reversed(rows):
+                self._events.append(AnalyticsEvent(
+                    timestamp=row[0], request_id=row[1], endpoint=row[2],
+                    status=row[3], groundedness_score=row[4], latency_seconds=row[5],
+                    fallback_used=bool(row[6]), no_context=bool(row[7]),
+                ))
+        except Exception as exc:
+            # DB init failure is non-fatal; analytics degrades to in-memory only.
+            print(f"[WARNING] Analytics DB init failed ({exc}); using in-memory only.")
 
     def record(self, event: AnalyticsEvent) -> None:
         with self._lock:
             self._events.append(event)
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute(
+                    "INSERT INTO analytics_events "
+                    "(timestamp, request_id, endpoint, status, groundedness_score, "
+                    "latency_seconds, fallback_used, no_context) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (event.timestamp, event.request_id, event.endpoint, event.status,
+                     event.groundedness_score, event.latency_seconds,
+                     int(event.fallback_used), int(event.no_context)),
+                )
+                conn.commit()
+        except Exception:
+            pass  # persistence failure must not affect the request path
 
     def summary(self) -> Dict[str, Any]:
         with self._lock:
