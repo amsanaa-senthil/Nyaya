@@ -1,12 +1,10 @@
-from qdrant_client import QdrantClient
 from qdrant_client.models import (
     VectorParams,
     Distance,
     PointStruct,
 )
-from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
+from config import QDRANT_COLLECTION
 from common_utils import create_qdrant_client
-import os
 import time
 import hashlib
 import uuid
@@ -126,7 +124,7 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
                     print(" OK")
                     batch_uploaded = True
                     break
-                except Exception as e:
+                except Exception:
                     if attempt < max_retries - 1:
                         # Exponential backoff with jitter
                         wait_time = (2 ** attempt) + (0.1 * (attempt + 1))
@@ -135,7 +133,7 @@ def store_in_qdrant(chunks, embeddings, pdf_name, replace_pdf=False):
                         
                         # Recreate client after connection error
                         if attempt >= 2:
-                            print(f"  Reconnecting to Qdrant...")
+                            print("  Reconnecting to Qdrant...")
                             client = create_qdrant_client(timeout_seconds=600)
                     else:
                         print(f" FAILED after {max_retries} attempts (continuing with other batches)...")

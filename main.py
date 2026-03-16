@@ -1,5 +1,5 @@
 import sys
-from pipeline.ingestion import process_all_pdfs, retry_deferred_pdfs, check_qdrant_connectivity
+from pipeline.ingestion import process_all_pdfs, retry_deferred_pdfs
 from graph.ranking_engine import show_most_cited_cases
 
 if __name__ == "__main__":
