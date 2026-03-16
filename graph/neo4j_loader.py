@@ -243,7 +243,7 @@ def _split_citation(citation):
     return parts[0].strip(), parts[1].strip()
 
 
-def dedupe_citations(citations, similarity_threshold=0.88, token_threshold=0.75):
+def dedupe_citations(citations, similarity_threshold=0.88):
     """
     Merge near-duplicate citations (OCR variants) using per-party fuzzy
     similarity. Returns list of canonical citation strings.

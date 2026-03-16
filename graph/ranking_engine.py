@@ -44,7 +44,7 @@ def _similar(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
 
-def _merge_cases(records, similarity_threshold=0.88, token_threshold=0.75):
+def _merge_cases(records, similarity_threshold=0.88):
     clusters = []
     for title, count in records:
         left, right = _split_title(title)
