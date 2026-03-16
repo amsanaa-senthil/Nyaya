@@ -1,7 +1,7 @@
 import types
 from typing import Any
 
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
 from agent.guardrails import LegalGuardrails, SafetyFilter, CitationValidator
 
 

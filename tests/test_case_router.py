@@ -1,6 +1,6 @@
 """Manual case-router smoke helper."""
 
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
 
 
 def run_manual_case_router_smoke() -> None:

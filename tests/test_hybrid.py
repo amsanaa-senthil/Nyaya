@@ -4,7 +4,7 @@ This file is intentionally non-automated so CI test runs are deterministic and
 do not call external model providers.
 """
 
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
 from dotenv import load_dotenv
 
 

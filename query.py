@@ -1,4 +1,4 @@
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
 from optimizations import is_valid_query
 
 
