@@ -6,7 +6,7 @@ from agent.retriever import HybridRetriever
 from agent.graph_tool import CitationGraph
 from agent.guardrails import LegalGuardrails, SafetyFilter, CitationValidator
 from optimizations import score_result_relevance, extract_query_terms, OPTIMIZED_SETTINGS, canonicalize_legal_query
-from agent.llm import generate_answer
+from agent.llm import generate_answer, generate_answer_with_history
 from common_utils import clean_text
 from agent.prompts import SYSTEM_PROMPT
 from dotenv import load_dotenv
@@ -221,7 +221,7 @@ class NyayaAgent:
         first = chain[0]
         return first.get("related", [])
 
-    def ask_with_report(self, query: str, debug_mode: bool = False) -> Dict[str, object]:
+    def ask_with_report(self, query: str, debug_mode: bool = False, history: Optional[List[Dict]] = None) -> Dict[str, object]:
         start_total = time.time()
         query_lower = query.lower()
         debug_trace = []
@@ -442,7 +442,10 @@ Example good answer:
 Now answer the user's question naturally:"""
         
         try:
-            answer = self._generate_with_llm(prompt)
+            if history:
+                answer = generate_answer_with_history(prompt, history)
+            else:
+                answer = self._generate_with_llm(prompt)
             
             # 🛡️ GUARDRAIL 2: Validate response with guardrails
             is_valid, validated_answer, warnings = self.guardrails.check_response(

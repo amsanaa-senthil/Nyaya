@@ -4,7 +4,7 @@ import app
 
 
 class StubAgent:
-    def ask_with_report(self, question, debug_mode=False):
+    def ask_with_report(self, question, debug_mode=False, history=None):
         if "batch-fail" in question:
             raise RuntimeError("forced failure")
         return {

@@ -10,20 +10,33 @@ import os
 import time
 import uuid
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
-from agent.agno_agent import NyayaAgent
+from agent.nyaya_agent import NyayaAgent
+from agent.llm import stream_answer
 from analytics_store import AnalyticsEvent, analytics_store
 from optimizations import is_valid_query
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Optional API key authentication.
+# Set NYAYA_API_KEY in .env to enable. Leave unset for open access (local dev).
+_API_KEY = os.getenv("NYAYA_API_KEY", "")
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def _require_api_key(key: Optional[str] = Security(_api_key_header)) -> None:
+    """FastAPI dependency: enforces X-API-Key when NYAYA_API_KEY is configured."""
+    if _API_KEY and key != _API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -74,6 +87,16 @@ class QueryRequest(BaseModel):
     description: Optional[str] = "Legal question about Sri Lankan law"
 
 
+class ChatTurn(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    question: str
+    history: List[ChatTurn] = Field(default_factory=list)
+
+
 class QueryResponse(BaseModel):
     question: str
     answer: str
@@ -111,6 +134,76 @@ def _to_dict(value: Any) -> Dict[str, Any]:
 def _log_event(event_name: str, **payload: Any) -> None:
     event = {"event": event_name, **payload}
     logger.info(json.dumps(event, default=str))
+
+
+def _validate_question(question: str) -> str:
+    cleaned = question.strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    if not is_valid_query(cleaned):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid query. Please ask a legal question (not commands or file paths).",
+        )
+    return cleaned
+
+
+def _build_query_response(question: str, report: Dict[str, Any]) -> QueryResponse:
+    answer = report.get("answer", "")
+    status = report.get("status", "success")
+    return QueryResponse(
+        question=question,
+        answer=answer if isinstance(answer, str) else str(answer),
+        status=status if isinstance(status, str) else "success",
+        source_map=_to_list_of_dict(report.get("source_map", [])),
+        precedent_chain=_to_list_of_dict(report.get("precedent_chain", [])),
+        groundedness_score=_to_float(report.get("groundedness_score", 0.0), 0.0),
+        reflection_report=_to_dict(report.get("reflection_report", {})),
+        latency_seconds=_to_float(report.get("latency_seconds", 0.0), 0.0),
+    )
+
+
+def _record_analytics(endpoint: str, request_id: str, response: QueryResponse) -> None:
+    analytics_store.record(
+        AnalyticsEvent(
+            timestamp=time.time(),
+            request_id=request_id,
+            endpoint=endpoint,
+            status=response.status,
+            groundedness_score=response.groundedness_score,
+            latency_seconds=response.latency_seconds,
+            fallback_used=response.status == "fallback",
+            no_context=response.status in {"no_context", "insufficient_evidence"},
+        )
+    )
+
+
+def _process_query(
+    endpoint: str,
+    request_id: str,
+    question: str,
+    history: Optional[List[Dict[str, str]]] = None,
+) -> QueryResponse:
+    log_payload: Dict[str, Any] = {
+        "request_id": request_id,
+        "question_preview": question[:100],
+    }
+    if history:
+        log_payload["history_turns"] = len(history)
+    _log_event(f"{endpoint.strip('/').replace('-', '_')}_started", **log_payload)
+
+    report = get_agent().ask_with_report(question, debug_mode=False, history=history)
+    response = _build_query_response(question, report)
+    _record_analytics(endpoint, request_id, response)
+
+    _log_event(
+        f"{endpoint.strip('/').replace('-', '_')}_completed",
+        request_id=request_id,
+        status=response.status,
+        groundedness=response.groundedness_score,
+        latency_seconds=response.latency_seconds,
+    )
+    return response
 
 
 @app.middleware("http")
@@ -156,7 +249,7 @@ def health_check():
 
 # Main query endpoint
 @app.post("/ask", response_model=QueryResponse)
-def ask_legal_question(request: QueryRequest, http_request: Request) -> QueryResponse:
+def ask_legal_question(request: QueryRequest, http_request: Request, _auth: None = Security(_require_api_key)) -> QueryResponse:
     """
     Ask a legal question about Sri Lankan law.
     
@@ -170,61 +263,11 @@ def ask_legal_question(request: QueryRequest, http_request: Request) -> QueryRes
         HTTPException 400: Invalid or empty question
         HTTPException 500: LLM or retrieval error
     """
-    question = request.question.strip()
-    
-    # Validate query
-    if not question:
-        raise HTTPException(
-            status_code=400,
-            detail="Question cannot be empty"
-        )
-    
-    if not is_valid_query(question):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid query. Please ask a legal question (not commands or file paths)."
-        )
+    question = _validate_question(request.question)
     
     try:
         request_id = getattr(http_request.state, "request_id", "unknown")
-        _log_event("ask_started", request_id=request_id, question_preview=question[:100])
-
-        report = get_agent().ask_with_report(question, debug_mode=False)
-
-        answer = report.get("answer", "")
-        status = report.get("status", "success")
-        
-        response = QueryResponse(
-            question=question,
-            answer=answer if isinstance(answer, str) else str(answer),
-            status=status if isinstance(status, str) else "success",
-            source_map=_to_list_of_dict(report.get("source_map", [])),
-            precedent_chain=_to_list_of_dict(report.get("precedent_chain", [])),
-            groundedness_score=_to_float(report.get("groundedness_score", 0.0), 0.0),
-            reflection_report=_to_dict(report.get("reflection_report", {})),
-            latency_seconds=_to_float(report.get("latency_seconds", 0.0), 0.0),
-        )
-
-        analytics_store.record(
-            AnalyticsEvent(
-                timestamp=time.time(),
-                request_id=request_id,
-                endpoint="/ask",
-                status=response.status,
-                groundedness_score=response.groundedness_score,
-                latency_seconds=response.latency_seconds,
-                fallback_used=response.status == "fallback",
-                no_context=response.status in {"no_context", "insufficient_evidence"},
-            )
-        )
-        _log_event(
-            "ask_completed",
-            request_id=request_id,
-            status=response.status,
-            groundedness=response.groundedness_score,
-            latency_seconds=response.latency_seconds,
-        )
-        return response
+        return _process_query("/ask", request_id, question)
     except Exception as e:
         request_id = getattr(http_request.state, "request_id", "unknown")
         _log_event("ask_failed", request_id=request_id, error=str(e))
@@ -234,9 +277,66 @@ def ask_legal_question(request: QueryRequest, http_request: Request) -> QueryRes
         )
 
 
+@app.post("/ask-chat", response_model=QueryResponse)
+def ask_chat(request: ChatRequest, http_request: Request, _auth: None = Security(_require_api_key)) -> QueryResponse:
+    """
+    Multi-turn chat endpoint.
+    Pass 'history' as a list of {role, content} turns (last 3 pairs used).
+    Returns a full QueryResponse identical to /ask.
+    """
+    question = _validate_question(request.question)
+
+    history = [{"role": t.role, "content": t.content} for t in request.history]
+
+    try:
+        request_id = getattr(http_request.state, "request_id", "unknown")
+        return _process_query("/ask-chat", request_id, question, history=history)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)[:200]}")
+
+
+@app.post("/ask-stream")
+def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Security(_require_api_key)):
+    """
+    Streaming response endpoint.
+    Yields answer tokens as plain text chunks (Server-Sent Events style).
+    Pass optional 'history' list of {role, content} for multi-turn context.
+    """
+    question = _validate_question(request.question)
+
+    history = [{"role": t.role, "content": t.content} for t in request.history]
+
+    # Build the prompt the same way the agent does, but stream the LLM output directly.
+    # We reuse the agent's retriever + prompt building by running a lightweight retrieval pass.
+    def _generate() -> Generator[str, None, None]:
+        try:
+            agent = get_agent()
+            from optimizations import canonicalize_legal_query
+            from agent.prompts import SYSTEM_PROMPT
+            retrieval_query = canonicalize_legal_query(question)
+            chunks = agent.retriever.search(retrieval_query, top_k=3, return_metadata=True)
+            context_blocks = []
+            for chunk in chunks[:2]:
+                if isinstance(chunk, dict):
+                    text = chunk.get("text", "")[:1200]
+                    pdf = chunk.get("pdf_name", "Unknown")
+                    page = chunk.get("page", "?")
+                    context_blocks.append(f"TEXT:\n{text}\n\nSOURCE: {pdf}, Page {page}\n---")
+            context_text = "\n\n".join(context_blocks)
+            prompt = (
+                f"{SYSTEM_PROMPT}\n\n**Context:**\n{context_text}\n\n**Question:** {question}\n\nAnswer:"
+            )
+            for token in stream_answer(prompt, history=history):
+                yield token
+        except Exception as exc:
+            yield f"\n\n[Error: {str(exc)[:200]}]"
+
+    return StreamingResponse(_generate(), media_type="text/plain")
+
+
 # Batch query endpoint
 @app.post("/ask-batch")
-def ask_batch(requests: list[QueryRequest], http_request: Request):
+def ask_batch(requests: list[QueryRequest], http_request: Request, _auth: None = Security(_require_api_key)):
     """
     Ask multiple legal questions in one request.
     
@@ -316,15 +416,22 @@ def get_info():
         "endpoints": {
             "health": "GET /health",
             "ask": "POST /ask",
+            "ask_chat": "POST /ask-chat (multi-turn, pass history[])",
+            "ask_stream": "POST /ask-stream (token streaming)",
             "batch": "POST /ask-batch",
             "info": "GET /info",
             "docs": "GET /docs"
         },
         "features": [
             "Hybrid retrieval (semantic 60% + BM25 40%)",
+            "Cross-encoder re-ranking (set NYAYA_RERANKER=1)",
             "Citation network analysis via Neo4j",
-            "Azure OpenAI (gpt-5-nano) for answers",
-            "Query validation and fallback handling"
+            "Azure OpenAI (gpt-5-nano) for answers with Gemini fallback",
+            "Multi-turn chat history via /ask-chat",
+            "Token streaming via /ask-stream",
+            "Optional API key auth (set NYAYA_API_KEY)",
+            "Query validation and fallback handling",
+            "SQLite-backed analytics persistence",
         ]
     }
 
