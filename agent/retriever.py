@@ -1,10 +1,10 @@
-from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
-from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION
+from config import QDRANT_COLLECTION
+import hashlib
 import os
+import pickle
 from dotenv import load_dotenv
 load_dotenv()
-import re
 from rank_bm25 import BM25Okapi
 from optimizations import (
     get_cached_query_result,
@@ -19,6 +19,23 @@ from resilience import CircuitBreaker, call_with_retry
 
 
 SC_ONLY_MODE = os.getenv("RETRIEVER_SC_ONLY", "1").strip().lower() not in {"0", "false", "no"}
+_RERANKER_ENABLED = os.getenv("NYAYA_RERANKER", "0").strip().lower() not in {"0", "false", "no"}
+
+# Lazily loaded cross-encoder (only when NYAYA_RERANKER=1)
+_cross_encoder = None
+
+def _get_cross_encoder():
+    global _cross_encoder
+    if _cross_encoder is not None:
+        return _cross_encoder
+    try:
+        from sentence_transformers import CrossEncoder  # type: ignore
+        _cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512)
+        print("[OK] Cross-encoder re-ranker loaded (ms-marco-MiniLM-L-6-v2)")
+    except Exception as exc:
+        print(f"[WARNING] Cross-encoder unavailable, falling back to hybrid scores: {exc}")
+        _cross_encoder = None
+    return _cross_encoder
 
 
 def _safe_year(value):
@@ -82,6 +99,43 @@ def _enrich_points(points, return_metadata=True):
     return enriched
 
 
+_BM25_CACHE_DIR = os.getenv("NYAYA_BM25_CACHE_DIR", ".bm25_cache")
+
+
+def _bm25_cache_key(num_docs: int) -> str:
+    """Cache key encodes collection size + SC-only mode so a schema change invalidates the cache."""
+    raw = f"{QDRANT_COLLECTION}:{num_docs}:sc_only={SC_ONLY_MODE}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _load_bm25_cache(num_docs: int):
+    """Return (bm25_model, documents) from disk cache, or (None, None) on miss/error."""
+    key = _bm25_cache_key(num_docs)
+    path = os.path.join(_BM25_CACHE_DIR, f"bm25_{key}.pkl")
+    if not os.path.exists(path):
+        return None, None
+    try:
+        with open(path, "rb") as f:
+            cached = pickle.load(f)
+        print(f"[OK] BM25 index loaded from disk cache ({num_docs} docs)")
+        return cached["model"], cached["documents"]
+    except Exception:
+        return None, None
+
+
+def _save_bm25_cache(num_docs: int, bm25_model, documents) -> None:
+    """Persist BM25 model + documents to disk."""
+    try:
+        os.makedirs(_BM25_CACHE_DIR, exist_ok=True)
+        key = _bm25_cache_key(num_docs)
+        path = os.path.join(_BM25_CACHE_DIR, f"bm25_{key}.pkl")
+        with open(path, "wb") as f:
+            pickle.dump({"model": bm25_model, "documents": documents}, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"[OK] BM25 index saved to disk cache ({num_docs} docs)")
+    except Exception as exc:
+        print(f"[WARNING] Could not save BM25 cache: {exc}")
+
+
 class VectorRetriever:
     def __init__(self):
         self.client = create_qdrant_client()
@@ -136,7 +190,7 @@ class HybridRetriever:
         self._build_bm25_index()
     
     def _build_bm25_index(self):
-        """Fetch all documents from Qdrant and build BM25 index"""
+        """Fetch all documents from Qdrant and build BM25 index (with disk cache)."""
         try:
             # Initialize as empty list (not None) to avoid NoneType errors
             self.documents = []
@@ -168,9 +222,19 @@ class HybridRetriever:
                 self.documents = []
                 self.bm25_model = None
                 return
+
+            raw_points = all_docs[0]
+            num_docs_total = len(raw_points)
+
+            # Try loading from disk cache before re-tokenizing everything
+            cached_model, cached_docs = _load_bm25_cache(num_docs_total)
+            if cached_model is not None and cached_docs is not None:
+                self.bm25_model = cached_model
+                self.documents = cached_docs
+                return
             
             # Extract text and tokenize for BM25
-            for point in all_docs[0]:
+            for point in raw_points:
                 payload = point.payload or {}
                 if SC_ONLY_MODE and not _is_sc_doc(payload):
                     continue
@@ -191,6 +255,7 @@ class HybridRetriever:
             if documents:
                 self.bm25_model = BM25Okapi(documents)
                 print(f"[OK] Built BM25 index from {len(documents)} documents")
+                _save_bm25_cache(num_docs_total, self.bm25_model, self.documents)
             else:
                 print("[WARNING] No documents found for BM25 indexing")
                 self.documents = []
@@ -251,7 +316,7 @@ class HybridRetriever:
                 # Create mapping of doc_id to BM25 score
                 for i, score in enumerate(bm25_ranking):
                     bm25_scores[i] = score
-            except Exception as e:
+            except Exception:
                 pass
         
         # Combine and rank results
@@ -316,6 +381,21 @@ class HybridRetriever:
             key=lambda x: x["final_score"],
             reverse=True
         )
+
+        # Optional cross-encoder re-ranking over top candidates
+        if _RERANKER_ENABLED:
+            ce = _get_cross_encoder()
+            if ce is not None:
+                candidates = sorted_results[:min(20, len(sorted_results))]
+                pairs = [(query, r["doc"].get("text", "")[:512]) for r in candidates]
+                try:
+                    ce_scores = ce.predict(pairs)
+                    for item, score in zip(candidates, ce_scores):
+                        item["final_score"] = float(score)
+                    candidates.sort(key=lambda x: x["final_score"], reverse=True)
+                    sorted_results = candidates + sorted_results[len(candidates):]
+                except Exception:
+                    pass  # silently fall back to hybrid scores
         
         # Apply relevance filtering (accuracy improvement)
         docs_for_filtering = [r["doc"] for r in sorted_results]
