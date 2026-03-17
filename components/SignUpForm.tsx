@@ -19,6 +19,7 @@ export default function SignUpForm() {
     confirmPassword:""
   });
 
+const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
 const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -26,15 +27,18 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   //Function to update the state as the user types
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
+  setErrorMsg(""); // Clear previous errors
 
   // Validate Username: No '@' allowed
   if (formData.username.includes("@")) {
-    alert("Usernames cannot contain the '@' symbol. Please choose another.");
+    //Setting up the appropriate error message to display in the UI
+    setErrorMsg("Usernames cannot contain the '@' symbol. Please choose another.");
     return;
   }
 
   if (formData.password !== formData.confirmPassword) {
-    alert("Passwords do not match!");
+    //Setting up the appropriate error message to display in the UI
+    setErrorMsg("Passwords do not match!");
     return;
   }
 
@@ -52,7 +56,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   if (error) {
     // This will catch "User already registered", "Password too short", etc.
-    alert(error.message); 
+    setErrorMsg(error.message); 
     return; // Stop the code here so it doesn't redirect!
   }
 
@@ -60,7 +64,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   // If email confirmation is ON, Supabase returns data but no session.
   // If the user already exists, sometimes 'data.user' is null or identities are empty.
   if (data.user && data.user.identities && data.user.identities.length === 0) {
-    alert("This email is already in use. Please try logging in.");
+    //Setting up the appropriate error message to display in the UI
+    setErrorMsg("This email is already in use. Please try logging in.");
     return;
   }
 
@@ -182,6 +187,13 @@ const handleSubmit = async (e: React.FormEvent) => {
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
         </div>
+
+        {/* Inline Error Message */}
+        {errorMsg && (
+          <div className="text-red-500 text-xs font-medium bg-red-50 p-2 rounded border border-red-200 mb-2">
+            {errorMsg}
+          </div>
+        )}
 
         <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
           Create Account

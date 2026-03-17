@@ -10,10 +10,12 @@ export default function LoginForm() {
   const [email, setEmail] = useState(""); // Use Email for Supabase Auth
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
 
 const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
+  setErrorMsg(""); // Clear old errors
 
   let loginEmail = email; // Staring with whatever the user typed
 
@@ -26,7 +28,8 @@ const handleLogin = async (e: React.FormEvent) => {
       .single();
 
     if (profileError || !profile) {
-      alert("Username not found. Please check or use your email.");
+      //Setting the appropriate error message to display in the UI
+      setErrorMsg("Username not found. Please check or use your email.");      
       setLoading(false);
       return;
     }
@@ -41,7 +44,7 @@ const handleLogin = async (e: React.FormEvent) => {
   });
 
   if (error) {
-    alert(error.message);
+    setErrorMsg(error.message); // Set Error message
     setLoading(false);
   } else {
     router.push("/dashboard"); 
@@ -50,13 +53,14 @@ const handleLogin = async (e: React.FormEvent) => {
 
 // Reset Password
 const handleResetPassword = async (email: string) => {
+  setErrorMsg(""); // Clear old errors
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     // This is where the user is sent AFTER clicking the link in their email
     redirectTo: `${window.location.origin}/auth/update-password`,
   });
 
   if (error) {
-    alert(error.message);
+    setErrorMsg(error.message);
   } else {
     alert("Password reset email sent! Check your inbox.");
   }
@@ -120,6 +124,13 @@ const handleResetPassword = async (email: string) => {
             />
           </div>
         </div>
+
+        {/* Inline Error Message */}
+        {errorMsg && (
+          <div className="text-red-500 text-xs font-medium bg-red-50 p-2 rounded border border-red-200 mb-2 animate-in fade-in duration-300">
+            {errorMsg}
+          </div>
+        )}
 
         <button 
           type="submit" 
