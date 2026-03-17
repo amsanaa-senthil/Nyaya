@@ -53,18 +53,46 @@ const handleLogin = async (e: React.FormEvent) => {
   }
 };
 
-// Reset Password
-const handleResetPassword = async (email: string) => {
+//Handling forgot password
+const handleForgotPassword = async () => {
   setErrorMsg(""); // Clear old errors
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    // This is where the user is sent AFTER clicking the link in their email
-    redirectTo: `${window.location.origin}/auth/update-password`,
-  });
+  
+  if (!email) {
+    alert("Please enter your email or username first!");
+    return;
+  }
 
-  if (error) {
+  setLoading(true);
+  let resetEmail = email;
+
+  try {
+    // 1. If it's a username (no '@'), find the email in the database
+    if (!email.includes("@")) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("username", email)
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error("Username not found. Please enter a valid username or email.");
+      }
+      resetEmail = profile.email;
+    }
+
+    // 2. Trigger the Supabase Reset
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth/update-password`,
+    });
+
+    if (error) throw error;
+
+    alert(`Password reset email sent to the address linked to this account!`);
+    
+  } catch (error: any) {
     setErrorMsg(error.message);
-  } else {
-    alert("Password reset email sent! Check your inbox.");
+  } finally {
+    setLoading(false);
   }
 };
 
@@ -154,14 +182,9 @@ const handleResetPassword = async (email: string) => {
         <div className="flex justify-center mb-4">
           <button 
             type="button"
-            onClick={() => {
-              if (!email) {
-                alert("Please enter your email address first!");
-                return;
-              }
-              handleResetPassword(email);
-            }}
-            className="text-xs text-blue-600 hover:underline font-medium"
+            onClick={handleForgotPassword} // Call the new helper function
+            disabled={loading}
+            className="text-xs text-blue-600 hover:underline font-medium disabled:text-gray-400"
           >
             Forgot password?
           </button>
