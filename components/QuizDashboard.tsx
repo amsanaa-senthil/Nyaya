@@ -4,6 +4,7 @@ import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, 
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function QuizDashboard() {
   const router = useRouter();
@@ -52,16 +53,29 @@ export default function QuizDashboard() {
     return <div className="min-h-screen flex items-center justify-center">Loading Nyaya Dashboard...</div>;
   }
 
-  return (
+ return (
     <div className="min-h-screen bg-gray-50 p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* User Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold uppercase">
-              {userProfile?.first_name?.charAt(0) || "U"}
+            {/* Profile Picture / Initial Placeholder */}
+            <div className="relative h-16 w-16 shrink-0">
+              {userProfile?.avatar_url && userProfile.avatar_url !== "/Nyaya_logo_temp.png" ? (
+                <Image
+                  src={userProfile.avatar_url}
+                  alt="Profile"
+                  fill
+                  className="rounded-full border-2 border-blue-600 object-cover shadow-sm"
+                />
+              ) : (
+                <div className="h-full w-full bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold uppercase border-2 border-blue-700">
+                  {userProfile?.first_name?.charAt(0) || "U"}
+                </div>
+              )}
             </div>
+
             <div>
               <h1 className="text-2xl font-bold text-gray-800">
                 Welcome back, {userProfile?.first_name || "Student"}!
@@ -70,38 +84,35 @@ export default function QuizDashboard() {
             </div>
           </div>
           
-          <div className="flex gap-3">
-
-            {/*Edit Profile Button*/}
+          {/* Action Buttons - Now correctly inside the header flex container */}
+          <div className="flex flex-wrap gap-3">
             <button 
               onClick={() => router.push("/dashboard/profile")}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200"
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95"
             >
-              <User size={20} />
+              <User size={18} />
               Edit Profile
             </button>
 
-            {/*Start New Quiz Button*/}
-            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
-              <PlayCircle size={20} />
-              Start New Quiz
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
+              <PlayCircle size={18} />
+              Start Quiz
             </button>
 
-            {/*Log Out Button*/}
-             <button 
+            <button 
               onClick={handleLogout}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200"
+              className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-xl font-semibold transition-all active:scale-95"
             >
-              <LogOut size={20} />
+              <LogOut size={18} />
               Sign Out
             </button>
-
           </div>
-        </div>
+        </div> {/* This closes the white header card */}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
+
+          {/* Total Quizzes Taken */}
           <StatCard 
             title="Total Quizzes Taken" 
             value={userStats?.total_quizzes_taken || 0} 
@@ -109,6 +120,7 @@ export default function QuizDashboard() {
             color="bg-blue-50"
           />
 
+          {/* Average Score */}
           <StatCard 
             title="Average Score" 
             value={`${userStats?.average_score || 0}%`} 
@@ -116,6 +128,7 @@ export default function QuizDashboard() {
             color="bg-purple-50"
           />
 
+          {/* Accuracy Rate */}
           <StatCard 
             title="Accuracy Rate" 
             value={`${userStats?.accuracy_rate || 0}%`} 
@@ -123,7 +136,7 @@ export default function QuizDashboard() {
             color="bg-green-50"
           />
 
-          {/* Range: High/Low */}
+          {/* Score Range */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-orange-50 rounded-lg">
@@ -151,7 +164,7 @@ export default function QuizDashboard() {
           />
 
           <StatCard 
-            title="Total Quizing Time" 
+            title="Total Quizzing Time" 
             value={formatTime(userStats?.total_quizzing_time_seconds)} 
             icon={<Clock className="text-blue-600" />} 
             color="bg-blue-50"
