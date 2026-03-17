@@ -1,5 +1,6 @@
 "use client"; 
-import { Mail, Lock, UserCircle } from "lucide-react";
+
+import { Mail, Lock, UserCircle, EyeOff, Eye } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,8 @@ export default function LoginForm() {
   const [email, setEmail] = useState(""); // Use Email for Supabase Auth
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
+  const [errorMsg, setErrorMsg] = useState(""); // State to store the error text   
+  const [showPassword, setShowPassword] = useState(false);  //State to toggle password visibility
 
 const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -93,7 +95,7 @@ const handleResetPassword = async (email: string) => {
 
       <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Nyaya Login</h2>
       
-      {/* 1. FIXED: Added handleLogin to onSubmit */}
+      {/*handleLogin to onSubmit */}
       <form className="space-y-4" onSubmit={handleLogin}>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Email or User Name</label>
@@ -115,13 +117,22 @@ const handleResetPassword = async (email: string) => {
           <div className="relative">
             <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
             <input 
-              type="password" 
+              type={showPassword ? "text" : "password"} // Dynamic type 
               required
               value={password} // 3. FIXED: Connected state
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" 
             />
+
+            {/* Toggle Button */}
+            <button
+              type="button" // Important: prevents form submission
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
           </div>
         </div>
 
@@ -162,7 +173,7 @@ const handleResetPassword = async (email: string) => {
           <div className="flex-grow border-t border-gray-300"></div>
         </div>
 
-        {/* 4. CLEANER GOOGLE LOGIN: Using Supabase native method */}
+        {/*Using Supabase native method for Google login*/}
         <button 
           onClick={handleGoogleLogin}
           type="button"

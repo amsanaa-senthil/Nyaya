@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Lock } from "lucide-react";
+import { Lock, Eye, EyeOff } from "lucide-react";
 
 export default function UpdatePassword() {
   // State to hold the new password string
@@ -16,6 +16,8 @@ export default function UpdatePassword() {
   const [confirmPassword, setConfirmPassword] = useState(""); //Confirm Password
   const [strength, setStrength] = useState(0); // To set password strength
   const [errorMsg, setErrorMsg] = useState(""); //To set error msg
+  const [showPassword, setShowPassword] = useState(false); //State to toggle password visibility
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); //State to toggle confirmpassword visibility
 
   // Function to calculate strength score (0 to 4)
   const checkStrength = (pw: string) => {
@@ -102,7 +104,7 @@ export default function UpdatePassword() {
               {/* Icon placement: Absolute positioning inside a relative container */}
               <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} // Dynamic type switching
                 placeholder="Min. 6 characters" 
                 required 
                 autoFocus // Automatically focuses the input when the page loads
@@ -113,6 +115,16 @@ export default function UpdatePassword() {
                   checkStrength(newPassword); // Actually triggers the bar to move!
                 }}
               />
+
+              {/* The Toggle Button */}
+              <button
+                type="button" // CRITICAL: must be "button" so it doesn't submit the form
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button> 
+              
             </div>
 
             {/*Strength Meter Visuals */}
@@ -150,7 +162,7 @@ export default function UpdatePassword() {
           <div className="relative">
             <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
             <input 
-              type="password" 
+              type={showConfirmPassword ? "text" : "password"} // Dynamic type 
               required
               placeholder="••••••••" 
               value={confirmPassword} 
@@ -161,6 +173,16 @@ export default function UpdatePassword() {
                   : "border-gray-200"
               }`} 
             />
+
+            {/* Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+            >
+              {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+
           </div>
         </div>
 

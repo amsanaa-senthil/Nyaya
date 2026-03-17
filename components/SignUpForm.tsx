@@ -1,5 +1,5 @@
 "use client";
-import { User, Mail, Lock, UserCircle } from "lucide-react";
+import { User, Mail, Lock, UserCircle, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
@@ -18,6 +18,10 @@ export default function SignUpForm() {
     password: "",
     confirmPassword:""
   });
+
+  //State to toggle password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,10 +191,18 @@ export default function SignUpForm() {
                 handleChange(e); // Keep your existing data update
                 checkStrength(e.target.value); // Add strength check
              }}
-              type="password" 
-              required
+              type={showPassword ? "text" : "password"} // Dynamic type              required
               placeholder="••••••••" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+
+              {/* Toggle Button */}
+              <button
+                type="button" // Important: prevents form submission
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
           </div>
         </div>
 
@@ -228,10 +240,19 @@ export default function SignUpForm() {
               name = "confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              type="password" 
-              required
+              type={showConfirmPassword ? "text" : "password"} // Dynamic type              required
               placeholder="••••••••" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+
+              {/* Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+              
           </div>
         </div>
 
