@@ -25,7 +25,7 @@ export default function ProfileDisplay() {
     surname: "",
     username: "",
     email: "",
-    avatarUrl: "/Nyaya_logo_temp.png", // Default image fallback
+    avatarUrl: "/Profile_Pic_Icon.png", // Default image fallback
   });
 
   // --- MODAL STATES ---
@@ -78,7 +78,7 @@ export default function ProfileDisplay() {
                 surname: data.surname || "Not Set",
                 username: data.username || "Not Set",
                 email: data.email || user.email || "Not Set",
-                avatarUrl: data.avatar_url || "/Nyaya_logo_temp.png",
+                avatarUrl: data.avatar_url || "/Profile_Pic_Icon.png",
             });
             }
         } catch (err) {

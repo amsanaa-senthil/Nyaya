@@ -101,7 +101,7 @@ export default function QuizDashboard() {
 
             <button 
               onClick={handleLogout}
-              className="flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-xl font-semibold transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95"
             >
               <LogOut size={18} />
               Sign Out
