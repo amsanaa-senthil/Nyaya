@@ -19,28 +19,47 @@ export default function SignUpForm() {
     confirmPassword:""
   });
 
-const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
-const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+  const [strength, setStrength] = useState(0);
+
+  // Function to calculate strength score (0 to 4)
+  const checkStrength = (pw: string) => {
+    let score = 0;
+    if (pw.length >= 6) score++; // Minimum length
+    if (pw.length >= 10) score++; // Bonus for length
+    if (/[0-9]/.test(pw)) score++; // PW Contains numbers
+    if (/[!@#$%^&*]/.test(pw)) score++; // Contains special characters
+    setStrength(score); //Setting the strength state to the calculated score
   };
 
   //Function to update the state as the user types
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setErrorMsg(""); // Clear previous errors
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(""); // Clear previous errors
 
-  // Validate Username: No '@' allowed
-  if (formData.username.includes("@")) {
-    //Setting up the appropriate error message to display in the UI
-    setErrorMsg("Usernames cannot contain the '@' symbol. Please choose another.");
-    return;
-  }
+    // Validate Username: No '@' allowed
+    if (formData.username.includes("@")) {
+      //Setting up the appropriate error message to display in the UI
+      setErrorMsg("Usernames cannot contain the '@' symbol. Please choose another.");
+      return;
+    }
 
-  if (formData.password !== formData.confirmPassword) {
-    //Setting up the appropriate error message to display in the UI
-    setErrorMsg("Passwords do not match!");
-    return;
-  }
+    // Validate Password Strength (Must be at least 'Fair')
+    if (strength < 2) {
+      setErrorMsg("Password is too weak. Strength must be at least 'Fair'.");
+      return;
+    }
+
+    // Validate password match
+    if (formData.password !== formData.confirmPassword) {
+      //Setting up the appropriate error message to display in the UI
+      setErrorMsg("Passwords do not match!");
+      return;
+    }
 
   const { data, error } = await supabase.auth.signUp({
     email: formData.email,
@@ -164,13 +183,41 @@ const handleSubmit = async (e: React.FormEvent) => {
             <input 
               name = "password"
               value={formData.password}
-              onChange={handleChange}
+              onChange={(e) => {
+                handleChange(e); // Keep your existing data update
+                checkStrength(e.target.value); // Add strength check
+             }}
               type="password" 
               required
               placeholder="••••••••" 
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
           </div>
         </div>
+
+        {/* Password Strength Bar */}
+        <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-300 ${
+              strength === 0 ? "w-0" :
+              strength === 1 ? "w-1/4 bg-red-500" :
+              strength === 2 ? "w-2/4 bg-orange-500" :
+              strength === 3 ? "w-3/4 bg-yellow-500" :
+              "w-full bg-green-500"
+            }`}
+          />
+        </div>
+
+        {/* Strength Label */}
+        <p className="text-[10px] mt-1 font-medium uppercase tracking-wider text-gray-400">
+          Strength: 
+          <span className={
+            strength <= 1 ? "text-red-500" : 
+            strength <= 3 ? "text-orange-500" : 
+            "text-green-500"
+          }>
+            {strength <= 1 ? " Weak" : strength <= 3 ? " Fair" : " Strong"}
+          </span>
+        </p>
 
         {/* Confirm Password Field */}
         <div>

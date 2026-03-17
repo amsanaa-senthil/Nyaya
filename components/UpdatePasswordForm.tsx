@@ -1,0 +1,160 @@
+"use client"; // Required because we use useState, useEffect, and useRouter (client-side hooks)
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Lock } from "lucide-react";
+
+export default function UpdatePassword() {
+  // State to hold the new password string
+  const [password, setPassword] = useState("");
+  // State to handle button loading UI during the async database call
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  const [strength, setStrength] = useState(0); // To set password strength
+  const [errorMsg, setErrorMsg] = useState(""); //To set error msg
+
+  // Function to calculate strength score (0 to 4)
+  const checkStrength = (pw: string) => {
+    let score = 0;
+    if (pw.length >= 6) score++; 
+    if (pw.length >= 10) score++; 
+    if (/[0-9]/.test(pw)) score++; 
+    if (/[!@#$%^&*]/.test(pw)) score++; 
+    setStrength(score);
+  };
+
+  /**
+   * handleUpdate: Sends the new password to Supabase.
+   * This works because the user arrives here via a 'recovery' magic link
+   * which grants them a temporary session to update their user data.
+   */
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevents the default browser form submission (page reload)
+
+    // Validate Password Strength (Must be at least 'Fair')
+    if (strength < 2) {
+      setErrorMsg("Password is too weak. Strength must be at least 'Fair'.");
+      return;
+    }
+
+    setLoading(true);
+
+
+    // Supabase built-in method to update user credentials
+    const { error } = await supabase.auth.updateUser({
+      password: password
+    });
+
+    if (error) {
+      // Common errors include: link expired, or password doesn't meet requirements
+      setErrorMsg("Error: " + error.message);
+      setLoading(false);
+    } else {
+      //Setiing the appropriate error message to display in the UI
+      setErrorMsg("Password updated successfully!");
+      
+      /** * Best Practice: Log the user out after a reset.
+       * This clears the temporary recovery session and forces a fresh login 
+       * with the new credentials for security.
+       */
+      await supabase.auth.signOut();
+      router.push("/login"); // Redirect to the login page
+    }
+  };
+
+  return (
+    // Outer container ensures the card is centered on all screen sizes
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      
+      {/* Main Card Container*/}
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+        
+        {/*Nyaya Logo*/}
+        <div className="flex justify-center mb-4">
+          <Image 
+            src="/Nyaya_logo_temp.png" 
+            alt="NYAYA Logo" 
+            width={80} 
+            height={80} 
+            className="rounded-full shadow-sm" 
+          />
+        </div>
+
+        <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">Set New Password</h2>
+        <p className="text-sm text-gray-500 text-center mb-8">
+          Enter a strong password to secure your Nyaya account.
+        </p>
+
+        <form onSubmit={handleUpdate} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <div className="relative">
+              {/* Icon placement: Absolute positioning inside a relative container */}
+              <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+              <input 
+                type="password" 
+                placeholder="Min. 6 characters" 
+                required 
+                autoFocus // Automatically focuses the input when the page loads
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black border-gray-200"
+                onChange={(e) => {
+                  const newPassword = e.target.value;
+                  setPassword(newPassword); // Updates the password state
+                  checkStrength(newPassword); // Actually triggers the bar to move!
+                }}
+              />
+            </div>
+
+            {/*Strength Meter Visuals */}
+            {password && (
+              <div className="mt-2">
+                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${
+                      strength === 1 ? "w-1/4 bg-red-500" :
+                      strength === 2 ? "w-2/4 bg-orange-500" :
+                      strength === 3 ? "w-3/4 bg-yellow-500" :
+                      strength === 4 ? "w-full bg-green-500" : "w-0"
+                    }`}
+                  />
+                </div>
+                <p className={`text-[10px] mt-1 font-bold uppercase tracking-wider ${
+                  strength <= 1 ? "text-red-500" : strength <= 3 ? "text-orange-500" : "text-green-500"
+                }`}>
+                  Strength: {strength <= 1 ? "Weak" : strength <= 3 ? "Fair" : "Strong"}
+                </p>
+              </div>
+            )}
+            </div>
+
+            {/* Inline Error Message Display */}
+          {errorMsg && (
+            <p className="text-red-500 text-xs font-medium bg-red-50 p-2 rounded border border-red-200 mt-4">
+              {errorMsg}
+            </p>
+          )}
+          
+
+          {/* Submit Button: 
+              Changes appearance when 'loading' to prevent double-submissions.
+          */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-100 disabled:bg-blue-300"
+          >
+            {loading ? "Updating..." : "Update Password"}
+          </button>
+        </form>
+
+        {/* Navigation link for users who clicked the reset link by mistake */}
+        <p className="text-center text-sm text-gray-600 mt-8">
+          Remembered your password? <a href="/login" className="text-blue-600 font-semibold hover:underline">Go back to Login</a>
+        </p>
+      </div>
+    </div>
+  );
+}
