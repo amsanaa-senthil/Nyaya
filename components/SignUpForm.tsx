@@ -206,30 +206,35 @@ export default function SignUpForm() {
           </div>
         </div>
 
-        {/* Password Strength Bar */}
-        <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className={`h-full transition-all duration-300 ${
-              strength === 0 ? "w-0" :
-              strength === 1 ? "w-1/4 bg-red-500" :
-              strength === 2 ? "w-2/4 bg-orange-500" :
-              strength === 3 ? "w-3/4 bg-yellow-500" :
-              "w-full bg-green-500"
-            }`}
-          />
-        </div>
+        {/* Only show the strength meter if the user has started typing */}
+        {formData.password && (
+          <>
+            {/* Password Strength Bar */}
+            <div className="mt-2 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-300 ${
+                  strength === 0 ? "w-0" :
+                  strength === 1 ? "w-1/4 bg-red-500" :
+                  strength === 2 ? "w-2/4 bg-orange-500" :
+                  strength === 3 ? "w-3/4 bg-yellow-500" :
+                  "w-full bg-green-500"
+                }`}
+              />
+            </div>
 
-        {/* Strength Label */}
-        <p className="text-[10px] mt-1 font-medium uppercase tracking-wider text-gray-400">
-          Strength: 
-          <span className={
-            strength <= 1 ? "text-red-500" : 
-            strength <= 3 ? "text-orange-500" : 
-            "text-green-500"
-          }>
-            {strength <= 1 ? " Weak" : strength <= 3 ? " Fair" : " Strong"}
-          </span>
-        </p>
+            {/* Strength Label */}
+            <p className="text-[10px] mt-1 font-medium uppercase tracking-wider text-gray-400">
+              Strength: 
+              <span className={
+                strength <= 1 ? "text-red-500" : 
+                strength <= 3 ? "text-orange-500" : 
+                "text-green-500"
+              }>
+                {strength <= 1 ? " Weak" : strength <= 3 ? " Fair" : " Strong"}
+              </span>
+            </p>
+          </>
+        )}
 
         {/* Confirm Password Field */}
         <div>
@@ -252,7 +257,7 @@ export default function SignUpForm() {
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
-              
+
           </div>
         </div>
 
