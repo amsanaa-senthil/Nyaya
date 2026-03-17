@@ -182,7 +182,7 @@ const handleSave = async () => {
           />
         </div>
         <h2 className="text-2xl font-bold text-gray-800">Account Details</h2>
-        <p className="text-sm text-gray-400">View your current profile information</p>
+        <p className="text-sm text-gray-400">View and edit your current profile information</p>
       </div>
 
       <div className="space-y-6">
@@ -237,7 +237,7 @@ const handleSave = async () => {
           <button 
             type="button"
             onClick={() => router.push("/dashboard/profile/reset-password")}
-            className="w-full flex items-center justify-center gap-2 h-12 border border-gray-200 rounded-xl text-gray-600 font-semibold hover:bg-gray-50 transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
           >
             <Lock size={16} />
             Reset Password
