@@ -309,21 +309,35 @@ const handleSave = async () => {
 
         {/* Action Buttons */}
         <div className="pt-6 space-y-3">
-          {/* Reset Password Button */}
-          <button 
-            type="button"
-            onClick={() => router.push("/dashboard/profile/reset-password")}
-            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
-          >
-            <Lock size={16} />
-            Reset Password
-          </button>
+          
+          {/* Top Row: Reset & Delete side-by-side */}
+          <div className="flex gap-3">
 
-          {/* Back to Dashboard Button */}
+            {/* Reset Password Buttons */}
+            <button 
+              type="button"
+              onClick={() => router.push("/dashboard/profile/reset-password")}
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+            >
+              <Lock size={16} />
+              Reset Password
+            </button>
+
+            {/* Delete Account */}
+            <button 
+              type="button"
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+            >
+              <X size={16} />
+              Delete Account
+            </button>
+          </div>
+
+          {/* Bottom Row: Back to Dashboard */}
           <button 
             type="button"
-            onClick={() => router.push("/dashboard")} // Navigates back to the main dashboard route
-            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+            onClick={() => router.push("/dashboard")} 
+            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-gray-200"
           >
             Go Back to Dashboard
           </button>
