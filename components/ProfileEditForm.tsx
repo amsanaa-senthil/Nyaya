@@ -17,6 +17,11 @@ export default function ProfileDisplay() {
   const [errorMsg, setErrorMsg] = useState(""); // State to hold error messages
   const fileInputRef = useRef<HTMLInputElement>(null); // 2. Ref for the hidden input
   const [uploadingImage, setUploadingImage] = useState(false); // New state for image upload
+
+  //States for Deleation of account
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
@@ -89,10 +94,56 @@ export default function ProfileDisplay() {
         };
 
         fetchUserData();
+    
     }, [router]);
 
-    // IMAGE UPLOAD LOGIC 
-  
+    const handleDeleteAccount = async () => {
+    // 1. Ensure the user actually typed something
+    if (!deletePassword) {
+      alert("Please enter your password to confirm.");
+      return;
+    }
+
+    setIsDeleting(true);
+    setErrorMsg("");
+
+    try {
+      // 2. MANUAL CREDENTIAL CHECK
+      // We attempt to sign in again with the current user's email and the password they just typed
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: deletePassword,
+      });
+
+      // If the password is wrong, Supabase will return an error here
+      if (verifyError) {
+        throw new Error("Verification failed: Incorrect password.");
+      }
+
+      // 3. DELETE FROM DATABASE
+      // If the password was correct, we proceed to wipe the user's profile row
+      const { error: deleteError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", profile.id);
+
+      if (deleteError) throw deleteError;
+
+      // 4. CLEANUP
+      // Log the user out of the session and redirect to signup
+      await supabase.auth.signOut();
+      alert("Account deleted successfully.");
+      router.push("/signup");
+
+    } catch (error: any) {
+      // Display the error (e.g., "Invalid login credentials")
+      setErrorMsg(error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+// IMAGE UPLOAD LOGIC  
   const handleAvatarClick = () => {
     if (!uploadingImage) fileInputRef.current?.click();
   };
@@ -326,6 +377,7 @@ const handleSave = async () => {
             {/* Delete Account */}
             <button 
               type="button"
+              onClick={() => setIsDeleteModalOpen(true)}
               className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
             >
               <X size={16} />
@@ -344,7 +396,7 @@ const handleSave = async () => {
         </div>
       </div>
 
-      {/* --- EDIT MODAL OVERLAY --- */}
+      {/*EDIT MODAL OVERLAY*/}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -383,6 +435,58 @@ const handleSave = async () => {
                 className="flex-1 py-2.5 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition disabled:bg-blue-300"
               >
                 {updating ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/*DELETE ACCOUNT SECURITY MODAL*/}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-red-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <ShieldCheck size={24} />
+              <h3 className="text-lg font-bold">Confirm Deletion</h3>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-6">
+              This action cannot be undone. All your quiz progress will be lost. Please enter your <strong>password</strong> to confirm.
+            </p>
+
+            {/* Error message specific to the modal */}
+            {errorMsg && (
+              <div className="mb-4 p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+                {errorMsg}
+              </div>
+            )}
+
+            <input 
+              type="password" 
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Your password"
+              className="w-full p-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black mb-6"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeletePassword("");
+                  setErrorMsg("");
+                }} 
+                className="flex-1 py-2.5 bg-gray-100 rounded-lg text-gray-600 font-medium hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 bg-red-600 rounded-lg text-white font-medium hover:bg-red-700 transition disabled:bg-red-300"
+              >
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
               </button>
             </div>
           </div>
