@@ -19,6 +19,8 @@ from agent.agno_agent import NyayaAgent
 from analytics_store import AnalyticsEvent, analytics_store
 from optimizations import is_valid_query
 
+from backend.admin_routes import router as admin_router
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,6 +31,8 @@ app = FastAPI(
     description="Sri Lankan Legal Question Answering System",
     version="1.0.0"
 )
+
+app.include_router(admin_router)
 
 _agent_lock = Lock()
 _agent_instance: Optional[NyayaAgent] = None
