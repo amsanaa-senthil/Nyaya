@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut } from "lucide-react";
+import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -71,16 +71,25 @@ export default function QuizDashboard() {
           </div>
           
           <div className="flex gap-3">
-             <button 
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-3 rounded-xl font-semibold transition-all"
-            >
-              <LogOut size={20} />
+
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
+              <User size={20} />
+              Edit Profile
             </button>
+
             <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
               <PlayCircle size={20} />
               Start New Quiz
             </button>
+
+             <button 
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200"
+            >
+              <LogOut size={20} />
+              Sign Out
+            </button>
+
           </div>
         </div>
 
