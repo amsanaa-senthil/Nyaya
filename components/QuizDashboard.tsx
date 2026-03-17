@@ -72,16 +72,22 @@ export default function QuizDashboard() {
           
           <div className="flex gap-3">
 
-            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
+            {/*Edit Profile Button*/}
+            <button 
+              onClick={() => router.push("/dashboard/profile")}
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200"
+            >
               <User size={20} />
               Edit Profile
             </button>
 
+            {/*Start New Quiz Button*/}
             <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200">
               <PlayCircle size={20} />
               Start New Quiz
             </button>
 
+            {/*Log Out Button*/}
              <button 
               onClick={handleLogout}
               className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200"
