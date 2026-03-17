@@ -22,6 +22,7 @@ export default function ProfileDisplay() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<"initial" | "confirm" | "password">("initial");
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
@@ -377,7 +378,10 @@ const handleSave = async () => {
             {/* Delete Account */}
             <button 
               type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
+              onClick={() => {
+                setIsDeleteModalOpen(true);
+                setDeleteStep("confirm"); // Start at the confirmation question
+              }}
               className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
             >
               <X size={16} />
@@ -441,54 +445,78 @@ const handleSave = async () => {
         </div>
       )}
 
-      {/*DELETE ACCOUNT SECURITY MODAL*/}
+      {/* DELETE ACCOUNT SECURITY MODAL */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-red-100 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center gap-3 text-red-600 mb-4">
-              <ShieldCheck size={24} />
-              <h3 className="text-lg font-bold">Confirm Deletion</h3>
-            </div>
-
-            <p className="text-sm text-gray-600 mb-6">
-              This action cannot be undone. All your quiz progress will be lost. Please enter your <strong>password</strong> to confirm.
-            </p>
-
-            {/* Error message specific to the modal */}
-            {errorMsg && (
-              <div className="mb-4 p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
-                {errorMsg}
+            
+            {/* STEP 1: ARE YOU SURE? */}
+            {deleteStep === "confirm" && (
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4">
+                  <X size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Are you absolutely sure?</h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  This will permanently delete your profile, quiz history, and stats. You cannot undo this.
+                </p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => { setIsDeleteModalOpen(false); setDeleteStep("initial"); }}
+                    className="flex-1 py-3 bg-gray-100 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition"
+                  >
+                    No, Keep it
+                  </button>
+                  <button 
+                    onClick={() => setDeleteStep("password")}
+                    className="flex-1 py-3 bg-red-600 rounded-xl font-semibold text-white hover:bg-red-700 transition"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
               </div>
             )}
 
-            <input 
-              type="password" 
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              placeholder="Your password"
-              className="w-full p-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black mb-6"
-              autoFocus
-            />
-
-            <div className="flex gap-3">
-              <button 
-                onClick={() => {
-                  setIsDeleteModalOpen(false);
-                  setDeletePassword("");
-                  setErrorMsg("");
-                }} 
-                className="flex-1 py-2.5 bg-gray-100 rounded-lg text-gray-600 font-medium hover:bg-gray-200 transition"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-                className="flex-1 py-2.5 bg-red-600 rounded-lg text-white font-medium hover:bg-red-700 transition disabled:bg-red-300"
-              >
-                {isDeleting ? "Deleting..." : "Confirm Delete"}
-              </button>
-            </div>
+            {/* STEP 2: PASSWORD VERIFICATION */}
+            {deleteStep === "password" && (
+              <>
+                <div className="flex items-center gap-3 text-red-600 mb-4">
+                  <ShieldCheck size={24} />
+                  <h3 className="text-lg font-bold">Verify Identity</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-6">
+                  Please enter your password to finalize the deletion.
+                </p>
+                {errorMsg && (
+                  <div className="mb-4 p-2 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+                    {errorMsg}
+                  </div>
+                )}
+                <input 
+                  type="password" 
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your password"
+                  className="w-full p-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black mb-6"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setDeleteStep("confirm")} 
+                    className="flex-1 py-2.5 bg-gray-100 rounded-lg text-gray-600 font-medium hover:bg-gray-200 transition"
+                  >
+                    Back
+                  </button>
+                  <button 
+                    onClick={handleDeleteAccount}
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 bg-red-600 rounded-lg text-white font-medium hover:bg-red-700 transition disabled:bg-red-300"
+                  >
+                    {isDeleting ? "Deleting..." : "Confirm Delete"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
