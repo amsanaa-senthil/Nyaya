@@ -90,54 +90,68 @@ export default function ProfileDisplay() {
     setIsModalOpen(true);
   };
 
-/**
-   * Saves the new value to Supabase
-   */
-  const handleSave = async () => {
-    // 1. Prevent saving empty values
-    if (!newValue.trim()) {
+const handleSave = async () => {
+    const trimmedValue = newValue.trim();
+
+    // 1. Basic Validation
+    if (!trimmedValue) {
       alert("Field cannot be empty");
       return;
     }
 
-    setUpdating(true);
-
-    try {
-      // 2. Get the current user session explicitly
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        throw new Error("You must be logged in to update your profile.");
+    // 2. Username Specific Rules
+    if (editingField.key === "username") {
+      if (trimmedValue.includes("@")) {
+        alert("Usernames cannot contain the '@' symbol.");
+        return;
       }
 
-      // 3. Map state keys to Database columns
+      setUpdating(true);
+
+      try {
+        // Check for Uniqueness
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: existingUser, error: checkError } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("username", trimmedValue) 
+          .neq("id", user?.id) // Don't count the current user's own name
+          .maybeSingle(); // Better than .single() as it doesn't throw error if 0 found
+
+        if (existingUser) {
+          alert("This username is already taken. Please choose another.");
+          setUpdating(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Check Error:", err);
+      }
+    }
+
+    // 3. Perform the actual Update
+    setUpdating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user session");
+
       const columnMap: Record<string, string> = {
         firstName: "first_name",
         surname: "surname",
         username: "username"
       };
 
-      const dbColumn = columnMap[editingField.key];
-
-      // 4. Perform the update
       const { error: dbError } = await supabase
         .from("profiles")
-        .update({ [dbColumn]: newValue.trim() })
-        .eq("id", user.id); // Use user.id directly from the auth call
+        .update({ [columnMap[editingField.key]]: trimmedValue })
+        .eq("id", user.id);
 
       if (dbError) throw dbError;
 
-      // 5. If successful, update local UI state
-      setProfile((prev) => ({ 
-        ...prev, 
-        [editingField.key]: newValue.trim() 
-      }));
-
-      // 6. Close the modal
+      // Update local UI and Close
+      setProfile((prev) => ({ ...prev, [editingField.key]: trimmedValue }));
       setIsModalOpen(false);
       
     } catch (error: any) {
-      console.error("Update Error:", error.message);
       alert("Error: " + error.message);
     } finally {
       setUpdating(false);
