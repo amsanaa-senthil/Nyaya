@@ -14,6 +14,7 @@ export default function ProfileDisplay() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false); // State for the "Save" button loading
+  const [errorMsg, setErrorMsg] = useState(""); // State to hold error messages
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
@@ -28,6 +29,11 @@ export default function ProfileDisplay() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<{key: string, label: string}>({ key: "", label: "" });
   const [newValue, setNewValue] = useState("");
+
+  // Clear error message when user starts typing
+  useEffect(() => {
+    if (errorMsg) setErrorMsg("");
+  }, [newValue]);
 
   /**
    * fetchUserData:
@@ -92,6 +98,7 @@ export default function ProfileDisplay() {
 
 const handleSave = async () => {
     const trimmedValue = newValue.trim();
+    setErrorMsg(""); // Reset error state
 
     // 1. Basic Validation
     if (!trimmedValue) {
@@ -102,7 +109,7 @@ const handleSave = async () => {
     // 2. Username Specific Rules
     if (editingField.key === "username") {
       if (trimmedValue.includes("@")) {
-        alert("Usernames cannot contain the '@' symbol.");
+        setErrorMsg("Usernames cannot contain the '@' symbol.");
         return;
       }
 
@@ -119,7 +126,7 @@ const handleSave = async () => {
           .maybeSingle(); // Better than .single() as it doesn't throw error if 0 found
 
         if (existingUser) {
-          alert("This username is already taken. Please choose another.");
+          setErrorMsg("This username is already taken. Please choose another.");
           setUpdating(false);
           return;
         }
@@ -152,7 +159,7 @@ const handleSave = async () => {
       setIsModalOpen(false);
       
     } catch (error: any) {
-      alert("Error: " + error.message);
+      setErrorMsg("Error: " + error.message);
     } finally {
       setUpdating(false);
     }
@@ -256,6 +263,13 @@ const handleSave = async () => {
                 <X size={20} />
               </button>
             </div>
+
+            {/* ERROR MESSAGE DISPLAY */}
+            {errorMsg && (
+                <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs font-medium rounded">
+                {errorMsg}
+                </div>
+            )}
 
             <p className="text-sm text-gray-500 mb-2">Current Value: <span className="font-medium text-gray-700">{profile[editingField.key as keyof typeof profile]}</span></p>
             
