@@ -236,6 +236,7 @@ const handleSave = async () => {
           {/* Reset Password Button */}
           <button 
             type="button"
+            onClick={() => router.push("/dashboard/profile/reset-password")}
             className="w-full flex items-center justify-center gap-2 h-12 border border-gray-200 rounded-xl text-gray-600 font-semibold hover:bg-gray-50 transition-all shadow-sm"
           >
             <Lock size={16} />
