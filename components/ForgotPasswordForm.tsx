@@ -13,6 +13,7 @@ export default function UpdatePassword() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const [confirmPassword, setConfirmPassword] = useState(""); //Confirm Password
   const [strength, setStrength] = useState(0); // To set password strength
   const [errorMsg, setErrorMsg] = useState(""); //To set error msg
 
@@ -39,6 +40,12 @@ export default function UpdatePassword() {
       setErrorMsg("Password is too weak. Strength must be at least 'Fair'.");
       return;
     }
+
+    // Confirm Password Match Check
+    if (password !== confirmPassword) {
+    setErrorMsg("Passwords do not match!");
+    return;
+  }
 
     setLoading(true);
 
@@ -136,7 +143,26 @@ export default function UpdatePassword() {
               {errorMsg}
             </p>
           )}
-          
+
+        {/* Confirm Password Field */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+            <input 
+              type="password" 
+              required
+              placeholder="••••••••" 
+              value={confirmPassword} 
+              onChange={(e) => setConfirmPassword(e.target.value)} 
+              className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black transition-colors ${
+                confirmPassword && password !== confirmPassword 
+                  ? "border-red-500 bg-red-50" 
+                  : "border-gray-200"
+              }`} 
+            />
+          </div>
+        </div>
 
           {/* Submit Button: 
               Changes appearance when 'loading' to prevent double-submissions.
