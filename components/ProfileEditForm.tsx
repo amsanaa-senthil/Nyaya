@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -23,6 +23,7 @@ export default function ProfileDisplay() {
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteStep, setDeleteStep] = useState<"initial" | "confirm" | "password">("initial");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
@@ -492,14 +493,26 @@ const handleSave = async () => {
                     {errorMsg}
                   </div>
                 )}
-                <input 
-                  type="password" 
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  placeholder="Your password"
-                  className="w-full p-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black mb-6"
-                  autoFocus
-                />
+
+                {/* PASSWORD INPUT WITH TOGGLE */}
+                <div className="relative mb-6">
+                  <input 
+                    type={showDeletePassword ? "text" : "password"} 
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="Your password"
+                    className="w-full p-3 pr-12 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black transition-all"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute right-3 top-3 text-gray-400 hover:text-red-600 transition-colors"
+                  >
+                    {showDeletePassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setDeleteStep("confirm")} 
