@@ -20,6 +20,7 @@ from analytics_store import AnalyticsEvent, analytics_store
 from optimizations import is_valid_query
 
 from backend.admin_routes import router as admin_router
+from backend.quiz_routes import router as quiz_router
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,7 @@ app = FastAPI(
 )
 
 app.include_router(admin_router)
+app.include_router(quiz_router)
 
 _agent_lock = Lock()
 _agent_instance: Optional[NyayaAgent] = None
