@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera } from "lucide-react";
@@ -15,9 +15,12 @@ export default function ProfileDisplay() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false); // State for the "Save" button loading
   const [errorMsg, setErrorMsg] = useState(""); // State to hold error messages
+  const fileInputRef = useRef<HTMLInputElement>(null); // 2. Ref for the hidden input
+  const [uploadingImage, setUploadingImage] = useState(false); // New state for image upload
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
+    id: "",
     firstName: "",
     surname: "",
     username: "",
@@ -70,6 +73,7 @@ export default function ProfileDisplay() {
             
             // 3. Map the data. Ensure these column names match your Supabase Table!
             setProfile({
+                id: user.id, // Set the ID here
                 firstName: data.first_name || "Not Set",
                 surname: data.surname || "Not Set",
                 username: data.username || "Not Set",
@@ -86,6 +90,53 @@ export default function ProfileDisplay() {
 
         fetchUserData();
     }, [router]);
+
+    // IMAGE UPLOAD LOGIC 
+  
+  const handleAvatarClick = () => {
+    if (!uploadingImage) fileInputRef.current?.click();
+  };
+
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploadingImage(true);
+      setErrorMsg("");
+
+      if (!event.target.files || event.target.files.length === 0) return;
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${Math.random()}.${fileExt}`;
+      const filePath = `${profile.id}/${fileName}`; // Folder named after User ID
+
+      // 1. Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Update Database profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      // 4. Update UI
+      setProfile((prev) => ({ ...prev, avatarUrl: publicUrl }));
+      
+    } catch (error: any) {
+      setErrorMsg("Image upload failed: " + error.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
     /**
    * Opens the edit modal for a specific field
@@ -171,10 +222,21 @@ const handleSave = async () => {
   return (
     <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 mx-auto">
       
+    {/*HIDDEN INPUT FIELD */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={uploadAvatar} 
+        accept="image/*" 
+        className="hidden" 
+      />
+
       {/* Profile Header: Avatar with Hover Effect */}
       <div className="flex flex-col items-center mb-8">
-        <div className="relative h-28 w-28 mb-4 group cursor-pointer">
-            
+        <div 
+        onClick={handleAvatarClick}
+        className="relative h-28 w-28 mb-4 group cursor-pointer">
+
           {/* Main Avatar Image */}
           <Image 
             src={profile.avatarUrl} 
@@ -183,12 +245,15 @@ const handleSave = async () => {
             className="rounded-full border-4 border-slate-800 object-cover bg-slate-900 shadow-md transition-all duration-300 group-hover:opacity-60 group-hover:scale-105" 
           />
           
-          {/* Camera Icon Overlay (Appears on Hover) */}
+          {/* Camera Icon Overlay or Spinner */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="bg-slate-800/50 p-2 rounded-full backdrop-blur-sm">
-                {/* Note: You may need to import Camera from lucide-react at the top */}
+            {!uploadingImage ? (
+              <div className="bg-slate-800/50 p-2 rounded-full backdrop-blur-sm">
                 <Camera size={24} className="text-white" />
-            </div>
+              </div>
+            ) : (
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+            )}
           </div>
         </div>
         
