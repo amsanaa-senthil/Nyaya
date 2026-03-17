@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -171,16 +171,27 @@ const handleSave = async () => {
   return (
     <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 mx-auto">
       
-      {/* Profile Header: Avatar and Title */}
+      {/* Profile Header: Avatar with Hover Effect */}
       <div className="flex flex-col items-center mb-8">
-        <div className="relative h-28 w-28 mb-4">
+        <div className="relative h-28 w-28 mb-4 group cursor-pointer">
+            
+          {/* Main Avatar Image */}
           <Image 
             src={profile.avatarUrl} 
             alt="User Avatar" 
             fill 
-            className="rounded-full border-4 border-slate-800 object-cover bg-slate-900 shadow-md" 
+            className="rounded-full border-4 border-slate-800 object-cover bg-slate-900 shadow-md transition-all duration-300 group-hover:opacity-60 group-hover:scale-105" 
           />
+          
+          {/* Camera Icon Overlay (Appears on Hover) */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="bg-slate-800/50 p-2 rounded-full backdrop-blur-sm">
+                {/* Note: You may need to import Camera from lucide-react at the top */}
+                <Camera size={24} className="text-white" />
+            </div>
+          </div>
         </div>
+        
         <h2 className="text-2xl font-bold text-gray-800">Account Details</h2>
         <p className="text-sm text-gray-400">View and edit your current profile information</p>
       </div>
