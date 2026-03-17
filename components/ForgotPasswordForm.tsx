@@ -167,12 +167,7 @@ export default function UpdatePassword() {
               placeholder="••••••••" 
               value={confirmPassword} 
               onChange={(e) => setConfirmPassword(e.target.value)} 
-              className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black transition-colors ${
-                confirmPassword && password !== confirmPassword 
-                  ? "border-red-500 bg-red-50" 
-                  : "border-gray-200"
-              }`} 
-            />
+              className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black transition-colors `}/>
 
             {/* Toggle Button */}
             <button
