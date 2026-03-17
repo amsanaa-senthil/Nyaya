@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserCircle, ShieldCheck, Pencil } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -12,9 +12,8 @@ import Image from "next/image";
  */
 export default function ProfileDisplay() {
   const router = useRouter();
-  
-  // loading: Controls whether to show a placeholder while waiting for DB data
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false); // State for the "Save" button loading
   
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
@@ -24,6 +23,11 @@ export default function ProfileDisplay() {
     email: "",
     avatarUrl: "/Nyaya_logo_temp.png", // Default image fallback
   });
+
+  // --- MODAL STATES ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<{key: string, label: string}>({ key: "", label: "" });
+  const [newValue, setNewValue] = useState("");
 
   /**
    * fetchUserData:
@@ -77,6 +81,69 @@ export default function ProfileDisplay() {
         fetchUserData();
     }, [router]);
 
+    /**
+   * Opens the edit modal for a specific field
+   */
+  const openEditModal = (fieldKey: string, label: string, currentValue: string) => {
+    setEditingField({ key: fieldKey, label: label });
+    setNewValue(currentValue === "Not Set" ? "" : currentValue);
+    setIsModalOpen(true);
+  };
+
+/**
+   * Saves the new value to Supabase
+   */
+  const handleSave = async () => {
+    // 1. Prevent saving empty values
+    if (!newValue.trim()) {
+      alert("Field cannot be empty");
+      return;
+    }
+
+    setUpdating(true);
+
+    try {
+      // 2. Get the current user session explicitly
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        throw new Error("You must be logged in to update your profile.");
+      }
+
+      // 3. Map state keys to Database columns
+      const columnMap: Record<string, string> = {
+        firstName: "first_name",
+        surname: "surname",
+        username: "username"
+      };
+
+      const dbColumn = columnMap[editingField.key];
+
+      // 4. Perform the update
+      const { error: dbError } = await supabase
+        .from("profiles")
+        .update({ [dbColumn]: newValue.trim() })
+        .eq("id", user.id); // Use user.id directly from the auth call
+
+      if (dbError) throw dbError;
+
+      // 5. If successful, update local UI state
+      setProfile((prev) => ({ 
+        ...prev, 
+        [editingField.key]: newValue.trim() 
+      }));
+
+      // 6. Close the modal
+      setIsModalOpen(false);
+      
+    } catch (error: any) {
+      console.error("Update Error:", error.message);
+      alert("Error: " + error.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   // Temporary UI shown during the initial database handshake
   if (loading) return <p className="text-center text-gray-500 py-10">Loading Profile Details...</p>;
 
@@ -104,7 +171,7 @@ export default function ProfileDisplay() {
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">First Name</label>
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.firstName}</span>
-            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+            <button onClick={() => openEditModal("firstName", "First Name", profile.firstName)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
                 <Pencil size={14} />
             </button>
           </div>
@@ -115,7 +182,7 @@ export default function ProfileDisplay() {
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Surname</label>
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.surname}</span>
-            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+            <button onClick={() => openEditModal("surname", "Surname", profile.surname)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
                 <Pencil size={14} />
             </button>
           </div>
@@ -126,7 +193,7 @@ export default function ProfileDisplay() {
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Username</label>
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.username}</span>
-            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+            <button onClick={() => openEditModal("username", "Username", profile.username)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
                 <Pencil size={14} />
             </button>
           </div>
@@ -163,8 +230,46 @@ export default function ProfileDisplay() {
             Go Back to Dashboard
           </button>
         </div>
-
       </div>
+
+      {/* --- EDIT MODAL OVERLAY --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Edit {editingField.label}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-2">Current Value: <span className="font-medium text-gray-700">{profile[editingField.key as keyof typeof profile]}</span></p>
+            
+            <input 
+              type="text" 
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              placeholder={`Enter new ${editingField.label.toLowerCase()}`}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black mb-6"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">
+                Cancel
+              </button>
+              <button 
+                onClick={handleSave} 
+                disabled={updating}
+                className="flex-1 py-2.5 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition disabled:bg-blue-300"
+              >
+                {updating ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div> // This closes the main white card
   );
 }
