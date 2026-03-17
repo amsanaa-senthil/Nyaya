@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { User, Mail, UserCircle, ShieldCheck } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -102,25 +102,33 @@ export default function ProfileDisplay() {
         {/* First Name  Row */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">First Name</label>
-          <div className="flex items-center gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
+          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.firstName}</span>
+            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                <Pencil size={14} />
+            </button>
           </div>
         </div>
 
         {/* Surname Row */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Surname</label>
-          <div className="flex items-center gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
+          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.surname}</span>
+            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                <Pencil size={14} />
+            </button>
           </div>
         </div>
 
         {/* Username Row */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Username</label>
-          <div className="flex items-center gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
-            <UserCircle size={18} className="text-gray-400 shrink-0" />
+          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.username}</span>
+            <button className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                <Pencil size={14} />
+            </button>
           </div>
         </div>
 
@@ -134,6 +142,28 @@ export default function ProfileDisplay() {
             <span className="truncate">{profile.email}</span>
           </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="pt-6 space-y-3">
+          {/* Reset Password Button */}
+          <button 
+            type="button"
+            className="w-full flex items-center justify-center gap-2 h-12 border border-gray-200 rounded-xl text-gray-600 font-semibold hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <Lock size={16} />
+            Reset Password
+          </button>
+
+          {/* Back to Dashboard Button */}
+          <button 
+            type="button"
+            onClick={() => router.push("/dashboard")} // Navigates back to the main dashboard route
+            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+          >
+            Go Back to Dashboard
+          </button>
+        </div>
+
       </div>
     </div> // This closes the main white card
   );
