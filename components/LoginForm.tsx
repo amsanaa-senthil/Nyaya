@@ -40,16 +40,36 @@ const handleLogin = async (e: React.FormEvent) => {
   }
 
   // 2. PROCEED WITH SUPABASE LOGIN
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email: loginEmail,
     password: password,
   });
 
-  if (error) {
-    setErrorMsg(error.message); // Set Error message
+  if (error || !authData.user) {
+    setErrorMsg(error?.message || "Login failed");
     setLoading(false);
-  } else {
+    return; // Stop here if login fails
+  }
+
+  // 3.Check User Role for Redirection
+  const { data: userProfile, error: roleError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", authData.user.id)
+    .single();
+
+  //FINAL REDIRECT LOGIC
+  if (roleError || !userProfile) {
+    // If we can't find a role, default to student dashboard
     router.push("/dashboard"); 
+    return;
+  }
+
+  // 4. Redirect based on role
+  if (userProfile.role === "admin") {
+    router.push("/admin/dashboard"); // Route to admin panel
+  } else {
+    router.push("/dashboard"); // Route to student panel
   }
 };
 
