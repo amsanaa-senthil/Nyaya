@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Clock, Trophy, Calendar, ChevronRight, Award } from "lucide-react";
+import { Clock, Trophy, Calendar, ChevronRight, Award, RotateCcw } from "lucide-react";
 
 /**
  * QuizHistory Component
@@ -49,7 +49,18 @@ export default function QuizHistory() {
         <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">
           {history.length} Total Attempts
         </span>
+
+        {/* RESET HISTORY BUTTON */}
+      <button 
+        onClick={() => { /* Implementation goes here later */ }}
+        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-semibold text-sm hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-sm"
+      >
+        <RotateCcw size={16} />
+        Reset History
+      </button>
+      
       </div>
+
 
       {/* Conditional Rendering: Check if history has data */}
       {history.length > 0 ? (
