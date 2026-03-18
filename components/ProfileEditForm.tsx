@@ -405,6 +405,11 @@ const handleSave = async () => {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+
+            <div className="flex justify-center mb-4">
+                  <Image src="/Nyaya_logo_temp.png" alt="NYAYA Logo" width={80} height={80} className="rounded-full shadow-sm" />
+            </div>
+
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-800">Edit {editingField.label}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
