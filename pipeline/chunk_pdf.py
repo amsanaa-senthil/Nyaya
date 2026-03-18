@@ -70,12 +70,13 @@ def _infer_section(lines, line_index):
     return "Unknown"
 
 
-def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50):
+def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50, extra_metadata=None):
     """
     Chunk per-page text while preserving metadata for citations.
     Returns list of dicts: text + source metadata.
     """
     chunks = []
+    extra_metadata = extra_metadata or {}
 
     for page in pages:
         page_number = page.get("page_number")
@@ -108,6 +109,7 @@ def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50):
                         "section": section,
                         "line_start": line_start,
                         "line_end": line_end,
+                        **extra_metadata,
                     })
 
                 if overlap > 0 and current_lines:
@@ -139,6 +141,7 @@ def chunk_pages_with_metadata(pages, pdf_name, chunk_size=300, overlap=50):
                 "section": section,
                 "line_start": line_start,
                 "line_end": line_end,
+                **extra_metadata,
             })
 
     return chunks

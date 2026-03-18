@@ -25,6 +25,33 @@ STOPWORDS = {
     "law", "legal"
 }
 
+LEGAL_ACRONYM_MAP = {
+    "cpc": "criminal procedure code sri lanka",
+    "evidence ord": "evidence ordinance sri lanka",
+    "evidence ordinance": "evidence ordinance sri lanka",
+    "penal code": "penal code sri lanka",
+    "constitution": "constitution of sri lanka",
+}
+
+
+def canonicalize_legal_query(query: str) -> str:
+    """
+    Expand legal shorthand and normalize section references for stronger lexical/semantic retrieval.
+    Example: "What does s.45 say in CPC?" -> "what does section 45 say in criminal procedure code sri lanka"
+    """
+    normalized = (query or "").strip().lower()
+    if not normalized:
+        return query
+
+    # Normalize section shorthand: s.45 / s 45 -> section 45
+    normalized = re.sub(r"\bs\.?\s*(\d+[a-zA-Z0-9-]*)\b", r"section \1", normalized)
+
+    for short_form, expanded in LEGAL_ACRONYM_MAP.items():
+        normalized = re.sub(rf"\b{re.escape(short_form)}\b", expanded, normalized)
+
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
 
 def extract_query_terms(query: str) -> List[str]:
     """Normalize and extract meaningful query terms for scoring/BM25."""
@@ -211,4 +238,6 @@ OPTIMIZED_SETTINGS = {
     "bm25_weight": 0.4,         # 40% keyword (good for cases)
     "parallel_workers": 4,      # For embedding generation
     "cache_enabled": True,      # Enable query caching
+    "null_result_threshold": 0.18,  # Match result_threshold; avoids premature null-refusal
+    "recency_weight": 0.103,
 }
