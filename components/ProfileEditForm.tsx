@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera, Eye,  } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 /**
@@ -486,6 +486,11 @@ const handleSave = async () => {
             {/* STEP 2: PASSWORD VERIFICATION */}
             {deleteStep === "password" && (
               <>
+
+                <div className="flex justify-center mb-4">
+                          <Image src="/Nyaya_logo_temp.png" alt="NYAYA Logo" width={80} height={80} className="rounded-full shadow-sm" />
+                </div>
+
                 <div className="flex items-center gap-3 text-red-600 mb-4">
                   <ShieldCheck size={24} />
                   <h3 className="text-lg font-bold">Verify Identity</h3>
