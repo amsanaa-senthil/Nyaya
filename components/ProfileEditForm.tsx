@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, UserCircle, ShieldCheck, Pencil, X, Camera, Eye,  } from "lucide-react";
 import Image from "next/image";
 
 /**

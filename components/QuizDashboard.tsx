@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, User } from "lucide-react";
+import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, User, History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -92,6 +92,11 @@ export default function QuizDashboard() {
             >
               <User size={18} />
               Edit Profile
+            </button>
+
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
+              <History size={18} />
+              Quiz History
             </button>
 
             <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
