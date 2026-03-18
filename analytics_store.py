@@ -26,6 +26,18 @@ CREATE TABLE IF NOT EXISTS analytics_events (
     no_context    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_ae_timestamp ON analytics_events(timestamp);
+
+CREATE TABLE IF NOT EXISTS user_search_history (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp     REAL    NOT NULL,
+    request_id    TEXT    NOT NULL,
+    user_id       TEXT    NOT NULL,
+    endpoint      TEXT    NOT NULL,
+    question      TEXT    NOT NULL,
+    answer_preview TEXT   NOT NULL,
+    status        TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ush_user_time ON user_search_history(user_id, timestamp DESC);
 """
 
 
@@ -89,6 +101,76 @@ class AnalyticsStore:
                 conn.commit()
         except Exception:
             pass  # persistence failure must not affect the request path
+
+    def record_user_search(
+        self,
+        *,
+        timestamp: float,
+        request_id: str,
+        user_id: str,
+        endpoint: str,
+        question: str,
+        answer_preview: str,
+        status: str,
+    ) -> None:
+        """Persist per-user search history for frontend chat/history views."""
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                conn.execute(
+                    "INSERT INTO user_search_history "
+                    "(timestamp, request_id, user_id, endpoint, question, answer_preview, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        timestamp,
+                        request_id,
+                        user_id,
+                        endpoint,
+                        question,
+                        answer_preview,
+                        status,
+                    ),
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    def get_user_history(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return newest-first user search history rows."""
+        safe_limit = max(1, min(limit, 200))
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                rows = conn.execute(
+                    "SELECT timestamp, request_id, endpoint, question, answer_preview, status "
+                    "FROM user_search_history WHERE user_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (user_id, safe_limit),
+                ).fetchall()
+            return [
+                {
+                    "timestamp": row[0],
+                    "request_id": row[1],
+                    "endpoint": row[2],
+                    "question": row[3],
+                    "answer_preview": row[4],
+                    "status": row[5],
+                }
+                for row in rows
+            ]
+        except Exception:
+            return []
+
+    def clear_user_history(self, user_id: str) -> int:
+        """Delete all history rows for a user and return deleted row count."""
+        try:
+            with sqlite3.connect(self._db_path) as conn:
+                cur = conn.execute(
+                    "DELETE FROM user_search_history WHERE user_id = ?",
+                    (user_id,),
+                )
+                conn.commit()
+                return cur.rowcount if cur.rowcount is not None else 0
+        except Exception:
+            return 0
 
     def summary(self) -> Dict[str, Any]:
         with self._lock:

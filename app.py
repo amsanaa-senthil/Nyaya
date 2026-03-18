@@ -178,11 +178,49 @@ def _record_analytics(endpoint: str, request_id: str, response: QueryResponse) -
     )
 
 
+def _extract_user_id(http_request: Request) -> Optional[str]:
+    """Read frontend user identity from request headers for history tracking."""
+    candidate = (
+        http_request.headers.get("X-User-ID")
+        or http_request.headers.get("X-User-Id")
+        or http_request.headers.get("X-User")
+    )
+    if not candidate:
+        return None
+    cleaned = candidate.strip()
+    if not cleaned:
+        return None
+    return cleaned[:128]
+
+
+def _record_user_history(
+    *,
+    endpoint: str,
+    request_id: str,
+    user_id: Optional[str],
+    question: str,
+    answer: str,
+    status: str,
+) -> None:
+    if not user_id:
+        return
+    analytics_store.record_user_search(
+        timestamp=time.time(),
+        request_id=request_id,
+        user_id=user_id,
+        endpoint=endpoint,
+        question=question,
+        answer_preview=(answer or "")[:280],
+        status=status,
+    )
+
+
 def _process_query(
     endpoint: str,
     request_id: str,
     question: str,
     history: Optional[List[Dict[str, str]]] = None,
+    user_id: Optional[str] = None,
 ) -> QueryResponse:
     log_payload: Dict[str, Any] = {
         "request_id": request_id,
@@ -195,6 +233,14 @@ def _process_query(
     report = get_agent().ask_with_report(question, debug_mode=False, history=history)
     response = _build_query_response(question, report)
     _record_analytics(endpoint, request_id, response)
+    _record_user_history(
+        endpoint=endpoint,
+        request_id=request_id,
+        user_id=user_id,
+        question=question,
+        answer=response.answer,
+        status=response.status,
+    )
 
     _log_event(
         f"{endpoint.strip('/').replace('-', '_')}_completed",
@@ -267,7 +313,8 @@ def ask_legal_question(request: QueryRequest, http_request: Request, _auth: None
     
     try:
         request_id = getattr(http_request.state, "request_id", "unknown")
-        return _process_query("/ask", request_id, question)
+        user_id = _extract_user_id(http_request)
+        return _process_query("/ask", request_id, question, user_id=user_id)
     except Exception as e:
         request_id = getattr(http_request.state, "request_id", "unknown")
         _log_event("ask_failed", request_id=request_id, error=str(e))
@@ -290,7 +337,8 @@ def ask_chat(request: ChatRequest, http_request: Request, _auth: None = Security
 
     try:
         request_id = getattr(http_request.state, "request_id", "unknown")
-        return _process_query("/ask-chat", request_id, question, history=history)
+        user_id = _extract_user_id(http_request)
+        return _process_query("/ask-chat", request_id, question, history=history, user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)[:200]}")
 
@@ -303,12 +351,15 @@ def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Securi
     Pass optional 'history' list of {role, content} for multi-turn context.
     """
     question = _validate_question(request.question)
+    request_id = getattr(http_request.state, "request_id", "unknown")
+    user_id = _extract_user_id(http_request)
 
     history = [{"role": t.role, "content": t.content} for t in request.history]
 
     # Build the prompt the same way the agent does, but stream the LLM output directly.
     # We reuse the agent's retriever + prompt building by running a lightweight retrieval pass.
     def _generate() -> Generator[str, None, None]:
+        collected_chunks: List[str] = []
         try:
             agent = get_agent()
             from optimizations import canonicalize_legal_query
@@ -327,8 +378,25 @@ def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Securi
                 f"{SYSTEM_PROMPT}\n\n**Context:**\n{context_text}\n\n**Question:** {question}\n\nAnswer:"
             )
             for token in stream_answer(prompt, history=history):
+                collected_chunks.append(token)
                 yield token
+            _record_user_history(
+                endpoint="/ask-stream",
+                request_id=request_id,
+                user_id=user_id,
+                question=question,
+                answer="".join(collected_chunks),
+                status="success",
+            )
         except Exception as exc:
+            _record_user_history(
+                endpoint="/ask-stream",
+                request_id=request_id,
+                user_id=user_id,
+                question=question,
+                answer=str(exc),
+                status="error",
+            )
             yield f"\n\n[Error: {str(exc)[:200]}]"
 
     return StreamingResponse(_generate(), media_type="text/plain")
@@ -403,6 +471,32 @@ def analytics_dashboard():
         </html>
     """
     return HTMLResponse(content=html)
+
+
+@app.get("/history")
+def get_history(http_request: Request, limit: int = 50):
+    user_id = _extract_user_id(http_request)
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing user identity header. Send X-User-ID.",
+        )
+    return {
+        "user_id": user_id,
+        "items": analytics_store.get_user_history(user_id, limit=limit),
+    }
+
+
+@app.delete("/history")
+def clear_history(http_request: Request):
+    user_id = _extract_user_id(http_request)
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing user identity header. Send X-User-ID.",
+        )
+    deleted = analytics_store.clear_user_history(user_id)
+    return {"user_id": user_id, "deleted": deleted}
 
 
 # Info endpoint
