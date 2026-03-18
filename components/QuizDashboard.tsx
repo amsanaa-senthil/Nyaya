@@ -94,7 +94,9 @@ export default function QuizDashboard() {
               Edit Profile
             </button>
 
-            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
+            <button 
+              onClick={() => router.push("/dashboard/quiz-history")}
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
               <History size={18} />
               Quiz History
             </button>
