@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { Clock, Trophy, Calendar, ChevronRight, Award, RotateCcw } from "lucide-react";
+import { supabase } from "../lib/supabaseClient"; // Fixed import path to match your previous context
+import { Clock, Trophy, Calendar, Award, RotateCcw, ShieldCheck, Eye, EyeOff, History } from "lucide-react";
+import Image from "next/image";
 
 /**
  * QuizHistory Component
@@ -12,31 +13,97 @@ export default function QuizHistory() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- MODAL STATES FOR DELETING HISTORY ---
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<"confirm" | "password">("confirm");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const fetchHistory = async () => {
+    // 1. Identify the current user session
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // 2. Query the 'quiz_history' table
+    // We order by 'completed_at' descending to show the most recent quizzes at the top
+    const { data, error } = await supabase
+      .from("quiz_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false });
+
+    if (!error) {
+      setHistory(data || []);
+    } else {
+      console.error("Error fetching quiz history:", error.message);
+    }
+    
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchHistory = async () => {
-      // 1. Identify the current user session
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // 2. Query the 'quiz_history' table
-      // We order by 'completed_at' descending to show the most recent quizzes at the top
-      const { data, error } = await supabase
-        .from("quiz_history")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("completed_at", { ascending: false });
-
-      if (!error) {
-        setHistory(data || []);
-      } else {
-        console.error("Error fetching quiz history:", error.message);
-      }
-      
-      setLoading(false);
-    };
-
     fetchHistory();
   }, []);
+
+  // --- LOGIC TO RESET HISTORY ---
+  const handleResetHistory = async () => {
+    setIsDeleting(true);
+    setErrorMsg("");
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error("User session not found.");
+
+      // 1. Verify Password by trying to sign in
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: deletePassword,
+      });
+
+      if (authError) {
+        setErrorMsg("Incorrect password. Please try again.");
+        setIsDeleting(false);
+        return;
+      }
+
+      // 2. Delete History Rows
+      const { error: deleteHistoryError } = await supabase
+        .from("quiz_history")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (deleteHistoryError) throw deleteHistoryError;
+
+      // 3. Reset User Stats to Zero
+      const { error: statsError } = await supabase
+        .from("user_stats")
+        .update({
+          total_quizzes_taken: 0,
+          average_score: 0,
+          accuracy_rate: 0,
+          highest_score: 0,
+          lowest_score: 0,
+          time_spent_per_quiz_seconds: 0,
+          total_quizzing_time_seconds: 0
+        })
+        .eq("id", user.id);
+
+      if (statsError) throw statsError;
+
+      // Success! Close modal and refresh UI
+      setIsDeleteModalOpen(false);
+      setDeleteStep("confirm");
+      setDeletePassword("");
+      fetchHistory(); // Refresh the list (will show empty state)
+      
+    } catch (err: any) {
+      setErrorMsg(err.message || "An error occurred while resetting data.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Loading state prevents layout shift while Supabase responds
   if (loading) return <div className="p-10 text-center text-gray-500 font-medium">Loading your history...</div>;
@@ -46,19 +113,21 @@ export default function QuizHistory() {
       {/* Header section with total count */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Quiz History</h2>
-        <span className="bg-blue-50 text-[#0f172a] px-3 py-1 rounded-full text-xs font-bold">
-          {history.length} Total Attempts
-        </span>
+        
+        <div className="flex items-center gap-3">
+          <span className="bg-blue-50 text-[#0f172a] px-3 py-1 rounded-full text-xs font-bold">
+            {history.length} Total Attempts
+          </span>
 
-        {/* RESET HISTORY BUTTON */}
-      <button 
-        onClick={() => { /* Implementation goes here later */ }}
-        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-semibold text-sm hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-sm"
-      >
-        <RotateCcw size={16} />
-        Reset History
-      </button>
-      
+          {/* RESET HISTORY BUTTON */}
+          <button 
+            onClick={() => { setIsDeleteModalOpen(true); setDeleteStep("confirm"); setErrorMsg(""); }}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-semibold text-sm hover:bg-red-600 hover:text-white transition-all active:scale-95 shadow-sm"
+          >
+            <RotateCcw size={16} />
+            Reset History
+          </button>
+        </div>
       </div>
 
 
@@ -114,6 +183,100 @@ export default function QuizHistory() {
           <Award size={48} className="mx-auto text-gray-200 mb-4" />
           <p className="text-gray-500 font-medium">No quiz records found.</p>
           <p className="text-sm text-gray-400 mt-1">Complete a quiz to see your history here!</p>
+        </div>
+      )}
+
+      {/* --- RESET QUIZ HISTORY SECURITY MODAL --- */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-orange-100 animate-in fade-in zoom-in duration-200">
+            
+            {/* STEP 1: CONFIRM RESET */}
+            {deleteStep === "confirm" && (
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-[#c5a059] text-[#0f172a] rounded-full flex items-center justify-center mb-4">
+                  <History size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Clear Quiz History?</h3>
+                <p className="text-sm text-slate-500 mb-6 px-2">
+                  This will permanently erase your past scores and reset your dashboard stats to zero. **This action cannot be undone.**
+                </p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => { setIsDeleteModalOpen(false); setDeleteStep("confirm"); }}
+                    className="flex-1 py-3 bg-[#d4b06a] rounded-xl font-bold text-white-600 hover:bg-[#c5a059] transition-all active:scale-95"
+                  >
+                    Keep History
+                  </button>
+                  <button 
+                    onClick={() => setDeleteStep("password")}
+                    className="flex-1 py-3 bg-[#1e293b] rounded-xl font-bold text-white hover:bg-[#0f172a] transition-all active:scale-95 shadow-lg shadow-orange-100"
+                  >
+                    Yes, Reset
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: PASSWORD VERIFICATION */}
+            {deleteStep === "password" && (
+              <>
+                <div className="flex justify-center mb-4">
+                  <Image src="/Nyaya_logo_temp.png" alt="NYAYA Logo" width={60} height={60} className="rounded-full shadow-sm" />
+                </div>
+
+                <div className="flex items-center gap-3 text-slate-800 mb-4 justify-center">
+                  <ShieldCheck size={24} className="text-[#c5a059]" />
+                  <h3 className="text-lg font-bold">Security Check</h3>
+                </div>
+                
+                <p className="text-sm text-slate-600 text-center mb-6">
+                  Please enter your password to confirm you want to reset your statistics.
+                </p>
+
+                {errorMsg && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 text-[11px] font-bold uppercase rounded-xl border border-red-100">
+                    {errorMsg}
+                  </div>
+                )}
+
+                {/* PASSWORD INPUT */}
+                <div className="relative mb-6">
+                  <input 
+                    type={showDeletePassword ? "text" : "password"} 
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="Confirm Password"
+                    className="w-full p-3 pr-12 border border-[#c5a059] rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-black transition-all bg-slate-50/50"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-[#c5a059] transition-colors"
+                  >
+                    {showDeletePassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setDeleteStep("confirm")} 
+                    className="flex-1 py-3 bg-[#d4b06a]  rounded-xl text-white-600 font-bold hover:bg-[#c5a059] transition active:scale-95"
+                  >
+                    Back
+                  </button>
+                  <button 
+                    onClick={handleResetHistory}
+                    disabled={isDeleting}
+                    className="flex-1 py-3 bg-[#1e293b] rounded-xl text-white font-bold hover:bg-[#0f172a] transition disabled:bg-orange-300 active:scale-95 shadow-lg shadow-orange-100"
+                  >
+                    {isDeleting ? "Resetting..." : "Reset Now"}
+                  </button> 
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
