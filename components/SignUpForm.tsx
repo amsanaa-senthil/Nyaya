@@ -199,7 +199,7 @@ export default function SignUpForm() {
               <button
                 type="button" // Important: prevents form submission
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#0f172a]"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -253,7 +253,7 @@ export default function SignUpForm() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#0f172a]"
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -268,13 +268,13 @@ export default function SignUpForm() {
           </div>
         )}
 
-        <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
+        <button className="w-full bg-[#0f172a] text-white py-2 rounded-lg font-semibold hover:bg-[#c5a059] transition">
           Create Account
         </button>
       </form>
 
       <p className="text-center text-sm text-gray-600 mt-6">
-        Already have an account? <a href="/login" className="text-blue-600 font-semibold hover:underline">Log in</a>
+        Already have an account? <a href="/login" className="text-[#0f172a] font-semibold hover:underline">Log in</a>
       </p>
     </div>
   );
