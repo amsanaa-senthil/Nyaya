@@ -204,6 +204,10 @@ class SafetyFilter:
     
     UNSAFE_PATTERNS = [
         (r'\bhow to commit\b', "Instructions for illegal activity"),
+        (r'\b(can|could|may|should)\s+i\s+(kill|murder|harm|attack)\b', "Violent wrongdoing"),
+        (r'\bhow\s+to\s+(kill|murder|harm|attack)\b', "Violent wrongdoing"),
+        (r'\b(best\s+way\s+to|ways\s+to)\s+(kill|murder|harm|attack)\b', "Violent wrongdoing"),
+        (r'\b(get away with|avoid getting caught)\b.*\b(kill|murder|harm|attack|crime)\b', "Evasion of violent crime accountability"),
         (r'\bforge\b.*\bdocument', "Document forgery"),
         (r'\bevade\b.*\btax', "Tax evasion"),
         (r'\blie\b.*\bcourt', "Perjury encouragement"),

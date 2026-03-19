@@ -354,6 +354,21 @@ def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Securi
     request_id = getattr(http_request.state, "request_id", "unknown")
     user_id = _extract_user_id(http_request)
 
+    # Keep behavior aligned with /ask and /ask-chat by applying the same safety gate.
+    agent = get_agent()
+    is_safe, safety_reason = agent.safety_filter.check_safety(question)
+    if not is_safe:
+        refusal = agent.safety_filter.get_refusal_message(safety_reason)
+        _record_user_history(
+            endpoint="/ask-stream",
+            request_id=request_id,
+            user_id=user_id,
+            question=question,
+            answer=refusal,
+            status="blocked",
+        )
+        return StreamingResponse(iter([refusal]), media_type="text/plain")
+
     history = [{"role": t.role, "content": t.content} for t in request.history]
 
     # Build the prompt the same way the agent does, but stream the LLM output directly.
@@ -361,7 +376,6 @@ def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Securi
     def _generate() -> Generator[str, None, None]:
         collected_chunks: List[str] = []
         try:
-            agent = get_agent()
             from optimizations import canonicalize_legal_query
             from agent.prompts import SYSTEM_PROMPT
             retrieval_query = canonicalize_legal_query(question)
