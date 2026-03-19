@@ -40,3 +40,26 @@ def test_health_has_cors_header_for_origin():
     response = client.get("/health", headers={"Origin": "http://localhost:3000"})
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") in {"*", "http://localhost:3000"}
+
+
+class StubSafetyFilter:
+    @staticmethod
+    def check_safety(_query):
+        return False, "Violent wrongdoing"
+
+    @staticmethod
+    def get_refusal_message(reason):
+        return f"I cannot provide advice on: {reason}"
+
+
+class StubAgentWithSafety:
+    safety_filter = StubSafetyFilter()
+
+
+def test_ask_stream_blocks_unsafe_query(monkeypatch):
+    monkeypatch.setattr(app, "get_agent", lambda: StubAgentWithSafety())
+    client = TestClient(app.app)
+
+    response = client.post("/ask-stream", json={"question": "Can I kill someone?", "history": []})
+    assert response.status_code == 200
+    assert "cannot provide advice" in response.text.lower()
