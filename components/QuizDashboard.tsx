@@ -123,7 +123,7 @@ export default function QuizDashboard() {
                   </div>
                 </div>
 
-                  <div className="w-full flex flex-col items-center gap-3 pt-6 border-t border-gray-100">
+                  <div className="w-full flex flex-col items-center gap-7 pt-6 border-t border-gray-100">
     
                     {/* Edit Profile Button */}
                     <button 
@@ -154,6 +154,7 @@ export default function QuizDashboard() {
           <h1 className="text-2xl font-bold text-[#1e293b] text-center w-full mb-2">
             Nyaya Quiz Dashboard
           </h1>
+
           
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,6 +197,18 @@ export default function QuizDashboard() {
               icon={<Clock className="text-[#1e293b]" />} 
               color="bg-[#c5a059]"
             />
+          </div>
+
+          {/* --- FULL WIDTH MOTIVATIONAL CARD --- */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-6 hover:shadow-md transition-all">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-slate-800 leading-tight">
+                {userStats?.average_score >= 80 ? "Excellent work! You're mastering the material. Keep pushing for that 100%!" :
+                userStats?.average_score >= 50 ? "Good progress! You have a solid foundation. Consistency is the key to mastery." :
+                userStats?.average_score > 0 ? "Keep practicing! Every mistake is a learning opportunity. You've got this." :
+                "Welcome to Nyaya! Start your first quiz to begin your journey toward legal mastery."}
+              </h3>
+            </div>
           </div>
 
           {/* --- FULL WIDTH STRETCHED BUTTONS ROW --- */}
