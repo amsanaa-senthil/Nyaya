@@ -295,14 +295,14 @@ const handleSave = async () => {
             src={profile.avatarUrl} 
             alt="User Avatar" 
             fill 
-            className="rounded-full border-4 border-slate-800 object-cover bg-slate-900 shadow-md transition-all duration-300 group-hover:opacity-60 group-hover:scale-105" 
+            className="rounded-full border-4 border-[#1e293b] object-cover bg-[#1e293b] shadow-md transition-all duration-300 group-hover:opacity-60 group-hover:scale-105" 
           />
           
           {/* Camera Icon Overlay or Spinner */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             {!uploadingImage ? (
               <div className="bg-slate-800/50 p-2 rounded-full backdrop-blur-sm">
-                <Camera size={24} className="text-white" />
+                <Camera size={24} className="text-[#1e293b]" />
               </div>
             ) : (
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
@@ -310,7 +310,7 @@ const handleSave = async () => {
           </div>
         </div>
         
-        <h2 className="text-2xl font-bold text-gray-800">Account Details</h2>
+        <h2 className="text-2xl font-bold text-[#1e293b]">Account Details</h2>
         <p className="text-sm text-gray-400">View and edit your current profile information</p>
       </div>
 
@@ -322,7 +322,7 @@ const handleSave = async () => {
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.firstName}</span>
             <button onClick={() => openEditModal("firstName", "First Name", profile.firstName)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} />
+                <Pencil size={14} className="text-[#1e293b]" />
             </button>
           </div>
         </div>
@@ -333,7 +333,7 @@ const handleSave = async () => {
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.surname}</span>
             <button onClick={() => openEditModal("surname", "Surname", profile.surname)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} />
+                <Pencil size={14} className="text-[#1e293b]"/>
             </button>
           </div>
         </div>
@@ -344,7 +344,7 @@ const handleSave = async () => {
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.username}</span>
             <button onClick={() => openEditModal("username", "Username", profile.username)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} />
+                <Pencil size={14} className="text-[#1e293b]"/>
             </button>
           </div>
         </div>
@@ -370,7 +370,7 @@ const handleSave = async () => {
             <button 
               type="button"
               onClick={() => router.push("/dashboard/profile/reset-password")}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-blue-100"
             >
               <Lock size={16} />
               Reset Password
@@ -383,7 +383,7 @@ const handleSave = async () => {
                 setIsDeleteModalOpen(true);
                 setDeleteStep("confirm"); // Start at the confirmation question
               }}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-blue-100"
             >
               <X size={16} />
               Delete Account
@@ -394,7 +394,7 @@ const handleSave = async () => {
           <button 
             type="button"
             onClick={() => router.push("/dashboard")} 
-            className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 rounded-xl text-white font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-gray-200"
+            className="w-full flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-gray-200"
           >
             Go Back to Dashboard
           </button>
@@ -436,13 +436,13 @@ const handleSave = async () => {
             />
 
             <div className="flex gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">
+              <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 bg-[#d4b06a] border border-gray-200 rounded-lg text-gray-600 font-medium hover:bg-[#c5a059] transition">
                 Cancel
               </button>
               <button 
                 onClick={handleSave} 
                 disabled={updating}
-                className="flex-1 py-2.5 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition disabled:bg-blue-300"
+                className="flex-1 py-2.5 bg-[#1e293b] rounded-lg text-white font-medium hover:bg-[#0f172a] transition disabled:bg-blue-300"
               >
                 {updating ? "Saving..." : "Save Changes"}
               </button>
