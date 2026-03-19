@@ -273,7 +273,7 @@ const handleSave = async () => {
   if (loading) return <p className="text-center text-gray-500 py-10">Loading Profile Details...</p>;
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 mx-auto">
+    <div className="bg-grey-100 p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 mx-auto">
       
     {/*HIDDEN INPUT FIELD */}
       <input 
@@ -344,7 +344,7 @@ const handleSave = async () => {
           <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
             <span className="truncate">{profile.username}</span>
             <button onClick={() => openEditModal("username", "Username", profile.username)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} className="text-[#1e293b]"/>
+                <Pencil size={14} className="text-[#1e293b]" />
             </button>
           </div>
         </div>
@@ -352,7 +352,7 @@ const handleSave = async () => {
         {/* Email Row */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 flex items-center gap-1">
-            Email Address <ShieldCheck size={12} className="text-green-500" />
+            Email Address <ShieldCheck size={12} className="text-[#c5a059]" />
           </label>
           <div className="flex items-center gap-3 h-12 p-3 bg-gray-100 rounded-xl border border-gray-200 text-gray-400 italic">
             <Mail size={18} className="shrink-0" />

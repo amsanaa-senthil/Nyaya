@@ -55,7 +55,7 @@ export default function QuizDashboard() {
 
   return (
     
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-8">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 md:p-8">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* --- LEFT COLUMN: PROFILE & QUICK ACTIONS --- */}
@@ -128,7 +128,7 @@ export default function QuizDashboard() {
                     {/* Edit Profile Button */}
                     <button 
                       onClick={() => router.push("/dashboard/profile")}
-                      className="w-full max-w-[220px] flex items-center justify-center gap-2 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-600 py-3 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
+                      className="w-full max-w-[220px] flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#0f172a] text-white-700 py-3 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
                     >
                       <User size={18} className="group-hover:scale-110 transition-transform" />
                       <span className="text-sm whitespace-nowrap">Edit Profile</span>
@@ -161,52 +161,40 @@ export default function QuizDashboard() {
               title="Total Quizzes Taken" 
               value={userStats?.total_quizzes_taken || 0} 
               icon={<LayoutDashboard className="text-[#1e293b]" />} 
-              color="bg-blue-50"
+              color="bg-[#c5a059]"
             />
             <StatCard 
               title="Average Score" 
               value={`${userStats?.average_score || 0}%`} 
               icon={<BarChart2 className="text-[#1e293b]" />} 
-              color="bg-blue-50"
+              color="bg-[#c5a059]"
             />
             <StatCard 
               title="Accuracy Rate" 
               value={`${userStats?.accuracy_rate || 0}%`} 
               icon={<Target className="text-[#1e293b]" />} 
-              color="bg-blue-50"
+              color="bg-[#c5a059]"
             />
 
             {/* Score Range Block */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Trophy className="text-[#1e293b]" size={24} />
-                </div>
-                <span className="text-gray-600 font-bold">Score Range</span>
-              </div>
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Highest</p>
-                  <p className="text-2xl font-black text-gray-800">{userStats?.highest_score || 0}%</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Lowest</p>
-                  <p className="text-2xl font-black text-gray-800">{userStats?.lowest_score || 0}%</p>
-                </div>
-              </div>
-            </div>
+            <StatCard 
+              title="Score Range (Low - High)" 
+              value={`${userStats?.lowest_score || 0}% - ${userStats?.highest_score || 0}%`} 
+              icon={<Trophy className="text-[#1e293b]" />} 
+              color="bg-[#c5a059]"
+            />
 
             <StatCard 
               title="Time Spent per Quiz" 
               value={formatTime(userStats?.time_spent_per_quiz_seconds)} 
               icon={<Clock className="text-[#1e293b]" />} 
-              color="bg-blue-50"
+              color="bg-[#c5a059]"
             />
             <StatCard 
               title="Total Quizzing Time" 
               value={formatTime(userStats?.total_quizzing_time_seconds)} 
               icon={<Clock className="text-[#1e293b]" />} 
-              color="bg-blue-50"
+              color="bg-[#c5a059]"
             />
           </div>
 
