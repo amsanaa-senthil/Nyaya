@@ -52,7 +52,7 @@ export default function InputBar({ onSend, disabled }: InputBarProps) {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Ask anything legal..."
                     disabled={disabled}
-                    className="flex-1 bg-transparent border-none outline-none text-navy-900 placeholder:text-navy-900/40 py-2 h-12"
+                    className="flex-1 bg-transparent border-none outline-none text-navy-900 !text-[#0B1120] placeholder:text-navy-900/40 py-2 h-12"
                 />
 
                 <button

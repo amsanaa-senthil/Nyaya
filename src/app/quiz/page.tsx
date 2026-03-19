@@ -175,14 +175,14 @@ export default function QuizSystemPage() {
     // View: Main List
     if (!activeQuizId || !activeQuiz) {
         return (
-            <div className="min-h-screen bg-gray-50/20 p-6 md:p-12 pb-24 relative overflow-hidden font-sans">
+            <div className="min-h-screen bg-grey-50 p-6 md:p-12 pb-24 relative overflow-hidden font-sans">
                 {/* Watermark Background */}
                 <div className="absolute top-0 right-0 bottom-0 pointer-events-none z-0 opacity-[0.1] overflow-hidden flex justify-end items-end pb-12 pr-12 lg:pb-0 lg:pr-0 lg:items-center">
                     <img src="/logolaw.png" alt="Nyaya Background" className="h-[70vh] md:h-[90vh] lg:h-[120vh] max-w-none lg:translate-x-[15%] lg:translate-y-[20%] translate-x-[20%] translate-y-[15%] object-contain select-none grayscale" />
                 </div>
 
                 {/* Navbar */}
-                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
+                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                         <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
@@ -232,9 +232,9 @@ export default function QuizSystemPage() {
     // View: Result View
     if (quizCompleted) {
         return (
-            <div className="min-h-screen bg-gray-50/20 flex flex-col items-center justify-center p-6 pb-20 relative font-sans">
+            <div className="min-h-screen bg-grey-50 flex flex-col items-center justify-center p-6 pb-20 relative font-sans">
                 {/* Navbar */}
-                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
+                <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                         <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
@@ -270,14 +270,14 @@ export default function QuizSystemPage() {
 
     // View: Active Question View
     return (
-        <div className="min-h-screen bg-gray-50/20 flex flex-col p-6 md:p-12 pb-24 relative overflow-hidden font-sans">
+        <div className="min-h-screen bg-[#FAF7F2] flex flex-col p-6 md:p-12 pb-24 relative overflow-hidden font-sans">
             {/* Watermark Background */}
             <div className="absolute top-0 right-0 bottom-0 pointer-events-none z-0 opacity-[0.1] overflow-hidden flex justify-end items-end pb-12 pr-12 lg:pb-0 lg:pr-0 lg:items-center">
                 <img src="/logolaw.png" alt="Nyaya Background" className="h-[70vh] md:h-[90vh] lg:h-[120vh] max-w-none lg:translate-x-[15%] lg:translate-y-[20%] translate-x-[20%] translate-y-[15%] object-contain select-none grayscale" />
             </div>
 
             {/* Navbar */}
-            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 ">
+            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                 <div className="flex items-center gap-2.5">
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                     <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>

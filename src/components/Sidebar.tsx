@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Plus, HelpCircle, Pin, Trash2, MoreHorizontal, Share2, Edit2, Check, X, PanelLeftClose, Sun, Moon } from 'lucide-react';
+import { Menu, Plus, HelpCircle, Pin, Trash2, MoreHorizontal, Share2, Edit2, Check, X, PanelLeftClose } from 'lucide-react';
 import { ChatSession } from '@/app/page';
 import Link from 'next/link';
 
@@ -16,8 +16,6 @@ interface SidebarProps {
     width: number;
     onToggle: () => void;
     onResizeStart: () => void;
-    theme: 'light' | 'dark';
-    onToggleTheme: () => void;
 }
 
 export default function Sidebar({
@@ -32,9 +30,7 @@ export default function Sidebar({
     isOpen,
     width,
     onToggle,
-    onResizeStart,
-    theme,
-    onToggleTheme
+    onResizeStart
 }: SidebarProps) {
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,14 +84,6 @@ export default function Sidebar({
                     <PanelLeftClose className="w-6 h-6" />
                 </button>
 
-                {/* Theme Toggle */}
-                <button
-                    onClick={onToggleTheme}
-                    className="p-2 hover:bg-navy-800 rounded-lg transition-colors text-white/70 hover:text-white"
-                    title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
-                >
-                    {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-                </button>
             </div>
 
             {/* Main Actions */}

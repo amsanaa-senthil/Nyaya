@@ -4,6 +4,7 @@ import React from 'react';
 import Sidebar from '@/components/Sidebar';
 import ChatWindow, { Message } from '@/components/ChatWindow';
 import { SearchMode } from '@/components/ModeToggle';
+import { askNyaya } from '@/lib/api';
 
 export interface ChatSession {
   id: string;
@@ -67,19 +68,7 @@ export default function Home() {
     };
   }, [resize, stopResizing]);
 
-  const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
 
-  React.useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
 
@@ -87,7 +76,7 @@ export default function Home() {
     setActiveChatId(null);
   };
 
-  const handleSendMessage = (content: string, mode: SearchMode) => {
+  const handleSendMessage = async (content: string, mode: SearchMode) => {
     // Included in the request payload as required
     console.log("Request Payload:", { message: content, mode });
 
@@ -120,11 +109,12 @@ export default function Home() {
 
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      const data = await askNyaya(content);
       const systemMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'system',
-        content: "This is a simulated response based on the legal context provided. In a real application, this would be fetched from the backend.",
+        content: data.answer,
         timestamp: new Date()
       };
 
@@ -134,8 +124,23 @@ export default function Home() {
         }
         return s;
       }));
+    } catch (e) {
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'system',
+        content: "Sorry, something went wrong. Please try again.",
+        timestamp: new Date()
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.id === currentChatId) {
+          return { ...s, messages: [...s.messages, errorMsg] };
+        }
+        return s;
+      }));
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const togglePin = (id: string) => {
@@ -185,25 +190,16 @@ export default function Home() {
         width={sidebarWidth}
         onToggle={toggleSidebar}
         onResizeStart={startResizing}
-        theme={theme}
-        onToggleTheme={toggleTheme}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full relative" style={{ marginLeft: isSidebarOpen ? 0 : 0 }}>
-        {!isSidebarOpen && (
-          <button
-            onClick={toggleSidebar}
-            className="absolute top-4 left-4 z-50 p-2 bg-navy-900 text-white rounded-lg shadow-lg hover:bg-navy-800 transition-colors"
-          >
-            {/* Menu Icon defined in Sidebar usually, but we need one here too. */}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-        )}
         <ChatWindow
           messages={activeSession ? activeSession.messages : []}
           isTyping={isTyping}
           onSendMessage={handleSendMessage}
+          sidebarOpen={isSidebarOpen}
+          onToggleSidebar={toggleSidebar}
         />
       </div>
     </main>

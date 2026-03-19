@@ -18,9 +18,11 @@ interface ChatWindowProps {
     messages: Message[];
     isTyping: boolean;
     onSendMessage: (content: string, mode: SearchMode) => void;
+    sidebarOpen?: boolean;
+    onToggleSidebar?: () => void;
 }
 
-export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWindowProps) {
+export default function ChatWindow({ messages, isTyping, onSendMessage, sidebarOpen = true, onToggleSidebar }: ChatWindowProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom
@@ -42,8 +44,16 @@ export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWi
             </div>
 
             {/* Navbar */}
-            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6">
+            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                 <div className="flex items-center gap-2.5">
+                    {!sidebarOpen && onToggleSidebar && (
+                        <button
+                            onClick={onToggleSidebar}
+                            className="w-11 h-11 bg-navy-900 text-white rounded-full shadow-lg hover:bg-navy-800 transition-colors flex items-center justify-center"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                    )}
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                     <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
                 </div>
