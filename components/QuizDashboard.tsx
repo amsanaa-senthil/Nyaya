@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, User, History } from "lucide-react";
+import { LayoutDashboard, PlayCircle, Trophy, Clock, Target, BarChart2, LogOut, User, History, Calendar, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -53,146 +53,201 @@ export default function QuizDashboard() {
     return <div className="min-h-screen flex items-center justify-center">Loading Nyaya Dashboard...</div>;
   }
 
- return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-8">
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* User Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center gap-4">
-            {/* Profile Picture / Initial Placeholder */}
-            <div className="relative h-16 w-16 shrink-0">
-              {userProfile?.avatar_url && userProfile.avatar_url !== "/Nyaya_logo_temp.png" ? (
-                <Image
-                  src={userProfile.avatar_url}
-                  alt="Profile"
-                  fill
-                  className="rounded-full border-2 border-blue-600 object-cover shadow-sm"
-                />
-              ) : (
-                <div className="h-full w-full bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold uppercase border-2 border-blue-700">
-                  {userProfile?.first_name?.charAt(0) || "U"}
-                </div>
-              )}
-            </div>
+        {/* --- LEFT COLUMN: PROFILE & QUICK ACTIONS --- */}
+        <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
+              
+              {/* Avatar Section */}
+              <div className="relative h-28 w-28 mb-6">
+                {userProfile?.avatar_url && userProfile.avatar_url !== "/Nyaya_logo_temp.png" ? (
+                  <Image
+                    src={userProfile.avatar_url}
+                    alt="Profile"
+                    fill
+                    className="rounded-full border-4 border-gray-50 object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-[#308194] rounded-full flex items-center justify-center text-white text-4xl font-bold uppercase">
+                    {userProfile?.first_name?.charAt(0) || "U"}{userProfile?.last_name?.charAt(0) || ""}
+                  </div>
+                )}
+              </div>
 
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">
-                Welcome back, {userProfile?.first_name || "Student"}!
+              {/* Header: Full Name */}
+              <h1 className="text-2xl font-bold text-slate-900 mb-6">
+                {userProfile?.first_name} {userProfile?.surname}
               </h1>
-              <p className="text-gray-500 text-sm">Track your Nyaya learning progress here.</p>
+
+              {/* Profile Info List */}
+              <div className="w-full space-y-5 border-t border-gray-100 pt-6 text-left">
+                
+                {/* Username Row */}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
+                    <User size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Username</p>
+                    <p className="text-sm font-semibold text-slate-700">{userProfile?.username || "user"}</p>
+                  </div>
+                </div>
+
+                {/* Email Row */}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
+                    <Mail size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Email Address</p>
+                    <p className="text-sm font-semibold text-slate-700">{userProfile?.email || "Not provided"}</p>
+                  </div>
+                </div>
+
+                {/* Joined Date Row */}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Member Since</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {userProfile?.created_at 
+                        ? new Date(userProfile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                        : userProfile ? "Date Missing" : "Loading..."} 
+                    </p>
+                  </div>
+                </div>
+
+                  <div className="w-full flex flex-col items-center gap-3 pt-6 border-t border-gray-100">
+    
+                    {/* Edit Profile Button */}
+                    <button 
+                      onClick={() => router.push("/dashboard/profile")}
+                      className="w-full max-w-[220px] flex items-center justify-center gap-2 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-600 py-3 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
+                    >
+                      <User size={18} className="group-hover:scale-110 transition-transform" />
+                      <span className="text-sm whitespace-nowrap">Edit Profile</span>
+                    </button>
+
+                    {/* Sign Out Button (Now directly below) */}
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full max-w-[220px] flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 py-3 rounded-2xl font-bold transition-all active:scale-95 group border border-red-100 shadow-sm"
+                    >
+                      <LogOut size={18} className="group-hover:translate-x-1 transition-transform" />
+                      <span className="text-sm whitespace-nowrap">Sign Out</span>
+                    </button>
+                    
+                  </div>
+              </div>
             </div>
           </div>
+
+        {/* --- RIGHT COLUMN: STATS & STRETCHED BUTTONS --- */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+
+          <h1 className="text-2xl font-bold text-gray-800 text-center w-full mb-2">
+            Nyaya Quiz Dashboard
+          </h1>
           
-          {/* Action Buttons - Now correctly inside the header flex container */}
-          <div className="flex flex-wrap gap-3">
-            <button 
-              onClick={() => router.push("/dashboard/profile")}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95"
-            >
-              <User size={18} />
-              Edit Profile
-            </button>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <StatCard 
+              title="Total Quizzes Taken" 
+              value={userStats?.total_quizzes_taken || 0} 
+              icon={<LayoutDashboard className="text-blue-600" />} 
+              color="bg-blue-50"
+            />
+            <StatCard 
+              title="Average Score" 
+              value={`${userStats?.average_score || 0}%`} 
+              icon={<BarChart2 className="text-purple-600" />} 
+              color="bg-purple-50"
+            />
+            <StatCard 
+              title="Accuracy Rate" 
+              value={`${userStats?.accuracy_rate || 0}%`} 
+              icon={<Target className="text-green-600" />} 
+              color="bg-green-50"
+            />
 
-            <button 
-              onClick={() => router.push("/dashboard/quiz-history")}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
-              <History size={18} />
-              Quiz History
-            </button>
-
-            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95">
-              <PlayCircle size={18} />
-              Start Quiz
-            </button>
-
-            <button 
-              onClick={handleLogout}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-md active:scale-95"
-            >
-              <LogOut size={18} />
-              Sign Out
-            </button>
-          </div>
-        </div> {/* This closes the white header card */}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-          {/* Total Quizzes Taken */}
-          <StatCard 
-            title="Total Quizzes Taken" 
-            value={userStats?.total_quizzes_taken || 0} 
-            icon={<LayoutDashboard className="text-blue-600" />} 
-            color="bg-blue-50"
-          />
-
-          {/* Average Score */}
-          <StatCard 
-            title="Average Score" 
-            value={`${userStats?.average_score || 0}%`} 
-            icon={<BarChart2 className="text-purple-600" />} 
-            color="bg-purple-50"
-          />
-
-          {/* Accuracy Rate */}
-          <StatCard 
-            title="Accuracy Rate" 
-            value={`${userStats?.accuracy_rate || 0}%`} 
-            icon={<Target className="text-green-600" />} 
-            color="bg-green-50"
-          />
-
-          {/* Score Range */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-orange-50 rounded-lg">
-                <Trophy className="text-orange-600" size={24} />
+            {/* Score Range Block */}
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Trophy className="text-orange-600" size={24} />
+                </div>
+                <span className="text-gray-600 font-bold">Score Range</span>
               </div>
-              <span className="text-gray-600 font-medium">Score Range</span>
-            </div>
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-xs text-gray-400 uppercase">Highest</p>
-                <p className="text-2xl font-bold text-gray-800">{userStats?.highest_score || 0}%</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400 uppercase">Lowest</p>
-                <p className="text-2xl font-bold text-gray-800">{userStats?.lowest_score || 0}%</p>
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Highest</p>
+                  <p className="text-2xl font-black text-gray-800">{userStats?.highest_score || 0}%</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Lowest</p>
+                  <p className="text-2xl font-black text-gray-800">{userStats?.lowest_score || 0}%</p>
+                </div>
               </div>
             </div>
+
+            <StatCard 
+              title="Time Spent per Quiz" 
+              value={formatTime(userStats?.time_spent_per_quiz_seconds)} 
+              icon={<Clock className="text-red-600" />} 
+              color="bg-red-50"
+            />
+            <StatCard 
+              title="Total Quizzing Time" 
+              value={formatTime(userStats?.total_quizzing_time_seconds)} 
+              icon={<Clock className="text-blue-600" />} 
+              color="bg-blue-50"
+            />
           </div>
 
-          <StatCard 
-            title="Time Spent per Quiz" 
-            value={formatTime(userStats?.time_spent_per_quiz_seconds)} 
-            icon={<Clock className="text-red-600" />} 
-            color="bg-red-50"
-          />
+          {/* --- FULL WIDTH STRETCHED BUTTONS ROW --- */}
+          {/* We move this OUTSIDE the grid so it can span the full width of the column */}
+          <div className="flex flex-row items-center justify-between gap-3 w-full mt-2">
+  
+              {/* History Button (50%) */}
+              <button 
+                onClick={() => router.push("/dashboard/quiz-history")}
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-4 py-4 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
+              >
+                <History size={18} className="group-hover:rotate-[-10deg] transition-transform" />
+                <span className="text-sm whitespace-nowrap">History</span>
+              </button>
 
-          <StatCard 
-            title="Total Quizzing Time" 
-            value={formatTime(userStats?.total_quizzing_time_seconds)} 
-            icon={<Clock className="text-blue-600" />} 
-            color="bg-blue-50"
-          />
+              {/* Start Quiz Button (50%) */}
+              <button 
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition-all shadow-md active:scale-95 group"
+              >
+                <PlayCircle size={20} className="group-hover:translate-x-1 transition-transform" />
+                <span className="text-sm whitespace-nowrap">Start Quiz</span>
+              </button>
+
+            </div>
+
         </div>
       </div>
     </div>
   );
-}
 
-// Reusable Card Component
-function StatCard({ title, value, icon, color }: { title: string, value: string | number, icon: React.ReactNode, color: string }) {
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-      <div className={`p-4 ${color} rounded-xl`}>
-        {icon}
+  function StatCard({ title, value, icon, color }: { title: string, value: string | number, icon: React.ReactNode, color: string }) {
+    return (
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+        <div className={`p-4 ${color} rounded-2xl`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-black text-gray-800">{value}</p>
+        </div>
       </div>
-      <div>
-        <p className="text-sm text-gray-500 font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-      </div>
-    </div>
-  );
+    );
+  }
 }
