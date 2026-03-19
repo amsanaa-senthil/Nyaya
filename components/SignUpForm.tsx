@@ -131,7 +131,7 @@ export default function SignUpForm() {
               type="text" 
               required
               placeholder="John" 
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" name="firstName" onChange={handleChange} />
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" name="firstName" onChange={handleChange} />
           </div>
 
           <div className="flex-1">
@@ -143,7 +143,7 @@ export default function SignUpForm() {
               type="text" 
               required
               placeholder="Doe" 
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" name="surname" onChange={handleChange} />
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" name="surname" onChange={handleChange} />
           </div>
         </div>
 
@@ -159,7 +159,7 @@ export default function SignUpForm() {
               type="email" 
               required
               placeholder="john@example.com" 
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" />
           </div>
         </div>
 
@@ -175,7 +175,7 @@ export default function SignUpForm() {
               type="text" 
               required
               placeholder="johndoe123" 
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" />
           </div>
         </div>
 
@@ -191,15 +191,15 @@ export default function SignUpForm() {
                 handleChange(e); // Keep your existing data update
                 checkStrength(e.target.value); // Add strength check
              }}
-              type={showPassword ? "text" : "password"} // Dynamic type              required
+              type={showPassword ? "text" : "password"} // Dynamic type              
               placeholder="••••••••" 
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" />
 
               {/* Toggle Button */}
               <button
                 type="button" // Important: prevents form submission
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#0f172a]"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#c5a059]"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -247,13 +247,13 @@ export default function SignUpForm() {
               onChange={handleChange}
               type={showConfirmPassword ? "text" : "password"} // Dynamic type              required
               placeholder="••••••••" 
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black" />
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#c5a059] outline-none text-black border-[#c5a059]" />
 
               {/* Toggle Button */}
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#0f172a]"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#c5a059]"
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>

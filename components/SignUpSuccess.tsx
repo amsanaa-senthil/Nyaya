@@ -51,7 +51,7 @@ export default function SignUpSuccess({ firstName, surname, username, email }: S
       {/* Back to login Button */}
       <Link 
         href="/login" 
-        className="w-full bg-[#1d61f2] hover:bg-[#1650cc] text-white font-bold py-3 rounded-xl text-center transition-all shadow-md"
+        className="w-full bg-[#0f172a] hover:bg-[#c5a059] text-white font-bold py-3 rounded-xl text-center transition-all shadow-md"
       >
         Login to Nyaya
       </Link>

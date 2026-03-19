@@ -459,7 +459,7 @@ const handleSave = async () => {
             {/* STEP 1: ARE YOU SURE? */}
             {deleteStep === "confirm" && (
               <div className="text-center">
-                <div className="mx-auto w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4">
+                <div className="mx-auto w-16 h-16 bg-[#c5a059] text-[#0f172a] rounded-full flex items-center justify-center mb-4">
                   <X size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-gray-800 mb-2">Are you absolutely sure?</h3>
@@ -469,13 +469,13 @@ const handleSave = async () => {
                 <div className="flex gap-3">
                   <button 
                     onClick={() => { setIsDeleteModalOpen(false); setDeleteStep("initial"); }}
-                    className="flex-1 py-3 bg-gray-100 rounded-xl font-semibold text-gray-600 hover:bg-gray-200 transition"
+                    className="flex-1 py-3 bg-[#d4b06a] rounded-xl font-semibold text-gray-600 hover:bg-[#c5a059] transition"
                   >
                     No, Keep it
                   </button>
                   <button 
                     onClick={() => setDeleteStep("password")}
-                    className="flex-1 py-3 bg-red-600 rounded-xl font-semibold text-white hover:bg-red-700 transition"
+                    className="flex-1 py-3 bg-[#1e293b] rounded-xl font-semibold text-white hover:bg-[#0f172a] transition"
                   >
                     Yes, Delete
                   </button>
@@ -491,7 +491,7 @@ const handleSave = async () => {
                           <Image src="/Nyaya_logo_temp.png" alt="NYAYA Logo" width={80} height={80} className="rounded-full shadow-sm" />
                 </div>
 
-                <div className="flex items-center gap-3 text-red-600 mb-4">
+                <div className="flex items-center gap-3 text-[#c5a059]">
                   <ShieldCheck size={24} />
                   <h3 className="text-lg font-bold">Verify Identity</h3>
                 </div>
@@ -511,13 +511,13 @@ const handleSave = async () => {
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     placeholder="Your password"
-                    className="w-full p-3 pr-12 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-black transition-all"
+                    className="w-full p-3 pr-12 border border-[#c5a059] rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-black transition-all"
                     autoFocus
                   />
                   <button
                     type="button"
                     onClick={() => setShowDeletePassword(!showDeletePassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-red-600 transition-colors"
+                    className="absolute right-3 top-3 text-gray-400 hover:text-[#c5a059] transition-colors"
                   >
                     {showDeletePassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -526,14 +526,14 @@ const handleSave = async () => {
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setDeleteStep("confirm")} 
-                    className="flex-1 py-2.5 bg-gray-100 rounded-lg text-gray-600 font-medium hover:bg-gray-200 transition"
+                    className="flex-1 py-2.5 bg-[#c5a059] rounded-lg text-gray-600 font-medium hover:bg-[#d4b06a] transition"
                   >
                     Back
                   </button>
                   <button 
                     onClick={handleDeleteAccount}
                     disabled={isDeleting}
-                    className="flex-1 py-2.5 bg-red-600 rounded-lg text-white font-medium hover:bg-red-700 transition disabled:bg-red-300"
+                    className="flex-1 py-2.5 bg-[#1e293b] rounded-lg text-white font-medium hover:bg-[#0f172a] transition disabled:bg-red-300"
                   >
                     {isDeleting ? "Deleting..." : "Confirm Delete"}
                   </button>
