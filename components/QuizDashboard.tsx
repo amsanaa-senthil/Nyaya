@@ -54,6 +54,7 @@ export default function QuizDashboard() {
   }
 
   return (
+    
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 md:p-8">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -150,7 +151,7 @@ export default function QuizDashboard() {
         {/* --- RIGHT COLUMN: STATS & STRETCHED BUTTONS --- */}
         <div className="lg:col-span-8 flex flex-col gap-6">
 
-          <h1 className="text-2xl font-bold text-gray-800 text-center w-full mb-2">
+          <h1 className="text-2xl font-bold text-[#1e293b] text-center w-full mb-2">
             Nyaya Quiz Dashboard
           </h1>
           
@@ -159,27 +160,27 @@ export default function QuizDashboard() {
             <StatCard 
               title="Total Quizzes Taken" 
               value={userStats?.total_quizzes_taken || 0} 
-              icon={<LayoutDashboard className="text-blue-600" />} 
+              icon={<LayoutDashboard className="text-[#1e293b]" />} 
               color="bg-blue-50"
             />
             <StatCard 
               title="Average Score" 
               value={`${userStats?.average_score || 0}%`} 
-              icon={<BarChart2 className="text-purple-600" />} 
-              color="bg-purple-50"
+              icon={<BarChart2 className="text-[#1e293b]" />} 
+              color="bg-blue-50"
             />
             <StatCard 
               title="Accuracy Rate" 
               value={`${userStats?.accuracy_rate || 0}%`} 
-              icon={<Target className="text-green-600" />} 
-              color="bg-green-50"
+              icon={<Target className="text-[#1e293b]" />} 
+              color="bg-blue-50"
             />
 
             {/* Score Range Block */}
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-orange-50 rounded-lg">
-                  <Trophy className="text-orange-600" size={24} />
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Trophy className="text-[#1e293b]" size={24} />
                 </div>
                 <span className="text-gray-600 font-bold">Score Range</span>
               </div>
@@ -198,13 +199,13 @@ export default function QuizDashboard() {
             <StatCard 
               title="Time Spent per Quiz" 
               value={formatTime(userStats?.time_spent_per_quiz_seconds)} 
-              icon={<Clock className="text-red-600" />} 
-              color="bg-red-50"
+              icon={<Clock className="text-[#1e293b]" />} 
+              color="bg-blue-50"
             />
             <StatCard 
               title="Total Quizzing Time" 
               value={formatTime(userStats?.total_quizzing_time_seconds)} 
-              icon={<Clock className="text-blue-600" />} 
+              icon={<Clock className="text-[#1e293b]" />} 
               color="bg-blue-50"
             />
           </div>
@@ -215,8 +216,9 @@ export default function QuizDashboard() {
   
               {/* History Button (50%) */}
               <button 
+
                 onClick={() => router.push("/dashboard/quiz-history")}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-4 py-4 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#0f172a] text-white py-4 py-4 rounded-2xl font-bold transition-all active:scale-95 group border border-gray-100 shadow-sm"
               >
                 <History size={18} className="group-hover:rotate-[-10deg] transition-transform" />
                 <span className="text-sm whitespace-nowrap">History</span>
@@ -224,7 +226,7 @@ export default function QuizDashboard() {
 
               {/* Start Quiz Button (50%) */}
               <button 
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold transition-all shadow-md active:scale-95 group"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#0f172a] text-white py-4 rounded-2xl font-bold transition-all shadow-md active:scale-95 group"
               >
                 <PlayCircle size={20} className="group-hover:translate-x-1 transition-transform" />
                 <span className="text-sm whitespace-nowrap">Start Quiz</span>
