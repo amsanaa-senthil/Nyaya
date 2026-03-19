@@ -235,12 +235,17 @@ try {
           >
             {loading ? "Updating..." : "Update Password"}
           </button>
+
+        {/* Redirect to Profile Button */}
+        <button 
+          type="button" 
+          onClick={() => router.push("/dashboard/profile")} // Redirects to the profile path
+          className="w-full bg-[#1e293b] text-white py-3 rounded-xl font-semibold hover:bg-[#c5a059] transition shadow-lg shadow-blue-100"
+        >
+          Back to Profile
+        </button>
         </form>
 
-        {/* Navigation link for users who clicked the reset link by mistake */}
-        <p className="text-center text-sm text-gray-600 mt-8">
-          Remembered your password? <a href="/login" className="text-[#1e293b] font-semibold hover:underline">Go back to Login</a>
-        </p>
       </div>
     </div>
   );
