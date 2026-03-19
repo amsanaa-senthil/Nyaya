@@ -46,7 +46,7 @@ export default function QuizHistory() {
       {/* Header section with total count */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Quiz History</h2>
-        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">
+        <span className="bg-blue-50 text-[#0f172a] px-3 py-1 rounded-full text-xs font-bold">
           {history.length} Total Attempts
         </span>
 
@@ -71,19 +71,11 @@ export default function QuizHistory() {
               className="group bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
             >
               <div className="flex items-center gap-4">
-                {/* Score Badge: 
-                  - Green: 75%+ (Excellent)
-                  - Blue: 40-74% (Passed/Average)
-                  - Red: Below 40% (Needs Review)
-                */}
-                <div className={`h-14 w-14 shrink-0 rounded-2xl flex flex-col items-center justify-center border transition-colors ${
-                  quiz.score >= 75 ? 'bg-green-50 border-green-100 text-green-600' : 
-                  quiz.score >= 40 ? 'bg-blue-50 border-blue-100 text-blue-600' : 
-                  'bg-red-50 border-red-100 text-red-600'
-                }`}>
-                  <span className="text-lg font-bold">{quiz.score}%</span>
-                  <span className="text-[10px] uppercase font-black opacity-60">Score</span>
-                </div>
+              {/* Unified Score Badge (Single Color Coding) */}
+              <div className="h-14 w-14 shrink-0 rounded-2xl flex flex-col items-center justify-center border border-slate-100 bg-[#c5a059] text-[#0f172a] transition-colors hover:bg-slate-100">
+                <span className="text-lg font-black leading-tight">{quiz.score}%</span>
+                <span className="text-[10px] uppercase font-black opacity-70 tracking-tighter">Score</span>
+              </div>
 
                 <div>
                   <h4 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
@@ -104,7 +96,7 @@ export default function QuizHistory() {
                 </div>
               </div>
 
-              {/* Right side: Questions count and arrow link */}
+              {/* Right side: Questions count */}
               <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
                 <div className="text-left md:text-right">
                   <p className="text-sm font-bold text-gray-700">
@@ -112,9 +104,6 @@ export default function QuizHistory() {
                   </p>
                   <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Performance</p>
                 </div>
-                <button className="p-2 bg-gray-50 rounded-full text-gray-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                  <ChevronRight size={20} />
-                </button>
               </div>
             </div>
           ))}
