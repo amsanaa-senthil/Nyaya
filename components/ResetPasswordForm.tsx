@@ -134,7 +134,7 @@ try {
               <button
                 type="button"
                 onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#1e293b]"
               >
                 {showCurrentPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -164,7 +164,7 @@ try {
               <button
                 type="button" // CRITICAL: must be "button" so it doesn't submit the form
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 transition-colors"
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-[#1e293b] transition-colors"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button> 
@@ -217,7 +217,7 @@ try {
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600"
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-[#1e293b]"
             >
               {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
@@ -231,7 +231,7 @@ try {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-100 disabled:bg-blue-300"
+            className="w-full bg-[#1e293b] text-white py-3 rounded-xl font-semibold hover:bg-[#c5a059] transition shadow-lg shadow-blue-100 disabled:bg-blue-300"
           >
             {loading ? "Updating..." : "Update Password"}
           </button>
@@ -239,7 +239,7 @@ try {
 
         {/* Navigation link for users who clicked the reset link by mistake */}
         <p className="text-center text-sm text-gray-600 mt-8">
-          Remembered your password? <a href="/login" className="text-blue-600 font-semibold hover:underline">Go back to Login</a>
+          Remembered your password? <a href="/login" className="text-[#1e293b] font-semibold hover:underline">Go back to Login</a>
         </p>
       </div>
     </div>

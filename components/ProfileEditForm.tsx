@@ -370,7 +370,7 @@ const handleSave = async () => {
             <button 
               type="button"
               onClick={() => router.push("/dashboard/profile/reset-password")}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-blue-100"
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
             >
               <Lock size={16} />
               Reset Password
@@ -383,7 +383,7 @@ const handleSave = async () => {
                 setIsDeleteModalOpen(true);
                 setDeleteStep("confirm"); // Start at the confirmation question
               }}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-blue-100"
+              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
             >
               <X size={16} />
               Delete Account
@@ -394,7 +394,7 @@ const handleSave = async () => {
           <button 
             type="button"
             onClick={() => router.push("/dashboard")} 
-            className="w-full flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#0f172a] transition-all shadow-lg shadow-gray-200"
+            className="w-full flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-gray-200"
           >
             Go Back to Dashboard
           </button>
