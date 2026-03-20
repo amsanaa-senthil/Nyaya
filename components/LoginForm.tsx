@@ -2,8 +2,6 @@
 
 import { Mail, Lock, UserCircle, EyeOff, Eye } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useLoginLogic } from "../lib/LoginForm";
 
 
