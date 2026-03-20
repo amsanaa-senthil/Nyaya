@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  /* Core Semantic Variables (Light Mode) */
+  --background: #FFFFFF;     /* Pure white app background */
+  --foreground: #0B1120;     /* Rich Navy text */
+
+  /* Navy Scale — Deep, authoritative tones */
+  --navy-900: #0F172A;       /* Darkest - Sidemenus */
+  --navy-800: #1E293B;       /* Buttons, active states */
+  --navy-700: #334155;       /* Lighter interactive elements */
+
+  /* Gold Scale — Refined champagne, not brassy */
+  --gold-500: #C5A059;       /* Primary accents */
+  --gold-400: #D4B06A;       /* Hover states */
+
+  /* Grey Base/Surface Scale — Clean SaaS feel */
+  --grey-50: #F8FAFC;        /* Cards, panels, secondary backgrounds */
+  --grey-100: #F1F5F9;       /* Inputs, slightly darker areas */
+  --grey-200: #E2E8F0;       /* Borders, dividers */
+  --grey-300: #CBD5E1;       /* Stronger borders */
+  --grey-400: #475569;       /* Secondary Text / Subtitles */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+
+  --color-gold-500: var(--gold-500);
+  --color-gold-400: var(--gold-400);
+
+  --color-grey-50: var(--grey-50);
+  --color-grey-100: var(--grey-100);
+  --color-grey-200: var(--grey-200);
+  --color-grey-300: var(--grey-300);
+  --color-grey-400: var(--grey-400);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-cormorant);
+}
+
+/* Body Defaults */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Ensure glass panels look good */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8); /* grey-200 */
+}
