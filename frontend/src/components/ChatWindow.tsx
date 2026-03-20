@@ -43,7 +43,7 @@ export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWi
             </div>
 
             {/* Navbar */}
-            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6">
+            <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6 pl-14 md:pl-24">
                 <div className="flex items-center gap-2.5">
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
                     <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
