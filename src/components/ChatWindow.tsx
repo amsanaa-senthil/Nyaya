@@ -55,7 +55,7 @@ export default function ChatWindow({ messages, isTyping, onSendMessage, sidebarO
                         </button>
                     )}
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
-                    <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
+                    <span className="font-serif font-bold text-navy-900 text-2xl md:text-3xl tracking-tight">Nyaya.lk</span>
                 </div>
                 <button className="w-11 h-11 md:w-12 md:h-12 bg-navy-900 text-white rounded-full hover:bg-navy-800 transition shadow-sm flex items-center justify-center">
                     <User className="w-5 h-5 md:w-5 md:h-5 text-gold-500" />
@@ -67,9 +67,9 @@ export default function ChatWindow({ messages, isTyping, onSendMessage, sidebarO
                 {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full px-4">
                         <div className="text-center mb-6">
-                            <h2 className="text-xl md:text-[22px] text-gold-500 leading-relaxed font-normal">
+                            <h2 className="text-xl md:text-[22px] text-black leading-relaxed font-normal">
                                 Hi , What do you<br />
-                                want to search in <span className="font-medium font-sans">Sri Lankan Cases</span> ?
+                                want to search in <span className="font-medium font-sans text-gold-500">Sri Lankan Cases</span> ?
                             </h2>
                         </div>
                         <div className="w-full max-w-3xl">

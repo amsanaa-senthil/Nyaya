@@ -185,7 +185,7 @@ export default function QuizSystemPage() {
                 <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
-                        <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
+                        <span className="font-serif font-bold text-navy-900 text-2xl md:text-3xl tracking-tight">Nyaya.lk</span>
                     </div>
                     <button className="w-11 h-11 md:w-12 md:h-12 bg-navy-900 text-white rounded-full hover:bg-navy-800 transition shadow-sm flex items-center justify-center">
                         <User className="w-5 h-5 md:w-5 md:h-5 text-gold-500" />
@@ -237,7 +237,7 @@ export default function QuizSystemPage() {
                 <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                     <div className="flex items-center gap-2.5">
                         <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
-                        <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
+                        <span className="font-serif font-bold text-navy-900 text-2xl md:text-3xl tracking-tight">Nyaya.lk</span>
                     </div>
                     <button className="w-11 h-11 md:w-12 md:h-12 bg-navy-900 text-white rounded-full hover:bg-navy-800 transition shadow-sm flex items-center justify-center">
                         <User className="w-5 h-5 md:w-5 md:h-5 text-gold-500" />
@@ -280,7 +280,7 @@ export default function QuizSystemPage() {
             <div className="w-full absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-2.5 md:p-3.5 bg-white/80 backdrop-blur-md shadow-sm">
                 <div className="flex items-center gap-2.5">
                     <img src="/nyayalogo.png" alt="Nyaya Logo" className="h-8 md:h-10 w-auto" />
-                    <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">NYAYA.LK</span>
+                    <span className="font-serif font-bold text-navy-900 text-lg md:text-xl tracking-tight">Nyaya.lk</span>
                 </div>
                 <button className="w-11 h-11 md:w-12 md:h-12 bg-navy-900 text-white rounded-full hover:bg-navy-800 transition shadow-sm flex items-center justify-center">
                     <User className="w-5 h-5 md:w-5 md:h-5 text-gold-500" />
