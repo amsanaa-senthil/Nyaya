@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from evaluate import NyayaEvaluator
 
 
@@ -24,7 +26,7 @@ class StubRetriever:
 
 def test_run_single_test_end_to_end_with_stubs():
     evaluator = NyayaEvaluator.__new__(NyayaEvaluator)
-    evaluator.agent = StubAgent()
+    evaluator.agent = cast(Any, StubAgent())
     evaluator.retriever = StubRetriever()
 
     test_case = {
