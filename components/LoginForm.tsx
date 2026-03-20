@@ -9,7 +9,7 @@ export default function LoginForm() {
   const {
     email, setEmail,
     password, setPassword,
-    loading, errorMsg,
+    loading, errorMsg, successMsg,
     showPassword, setShowPassword,
     handleLogin,
     handleForgotPassword,
@@ -70,6 +70,12 @@ export default function LoginForm() {
         {errorMsg && (
           <div className="text-red-500 text-xs font-medium bg-red-50 p-2 rounded border border-red-200 mb-2 animate-in fade-in duration-300">
             {errorMsg}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="text-green-600 text-xs font-medium bg-green-50 p-2 rounded border border-green-200 mb-2 animate-in fade-in duration-300">
+            {successMsg}
           </div>
         )}
 

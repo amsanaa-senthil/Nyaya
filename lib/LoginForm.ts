@@ -10,6 +10,7 @@ export function useLoginLogic() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(""); // State to store the error text   
+  const [successMsg, setSuccessMsg] = useState(""); // State to store the success text
   const [showPassword, setShowPassword] = useState(false);  //State to toggle password visibility
 
 const handleLogin = async (e: React.FormEvent) => {
@@ -105,7 +106,7 @@ const handleForgotPassword = async () => {
 
     if (error) throw error;
 
-    alert(`Password reset email sent to the address linked to this account!`);
+    setSuccessMsg("Check your inbox! We've sent a reset link to your linked email.");
     
   } catch (error: any) {
     setErrorMsg(error.message);
@@ -139,6 +140,6 @@ const handleForgotPassword = async () => {
     showPassword, setShowPassword,
     handleLogin,
     handleForgotPassword,
-    handleGoogleLogin
+    handleGoogleLogin, successMsg
   };
 }
