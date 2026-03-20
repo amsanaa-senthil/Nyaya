@@ -1,23 +1,4 @@
-"use client";
-
-import Image from "next/image";
-import { Lock, Eye, EyeOff } from "lucide-react";
-import { useUpdatePassword } from "@/lib/ForgotPasswordForm";
-
-
-export default function UpdatePassword() {
-  // Connect the UI to the Logic
-  const {
-    password, setPassword,
-    confirmPassword, setConfirmPassword,
-    loading, strength,
-    errorMsg,
-    showPassword, setShowPassword,
-    showConfirmPassword, setShowConfirmPassword,
-    checkStrength, handleUpdate
-  } = useUpdatePassword();
-
-  return (
+return (
     // Outer container ensures the card is centered on all screen sizes
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       
