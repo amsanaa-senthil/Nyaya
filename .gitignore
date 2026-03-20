@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+.env
 
 # vercel
 .vercel
@@ -39,3 +40,39 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+pdfs/
+
+# Evaluation files (keep local only)
+evaluation_dataset.json
+evaluation_results.json
+optimization_results.json
+TEST_QUESTIONS.md
+evaluation_reports/
+PROJECT_SUMMARY.md
+OPEN_SOURCE_DEPENDENCIES.md
+
+# Cache files
+.query_cache/
+.bm25_index.pkl
+.index_state.json
+.bm25_cache/
+nyaya_analytics.db
+pytest_out.txt
+requirements.optional-training.txt
+
+# Development/testing scripts (not needed in production)
+check_metadata.py
+optimize_weights.py
+analyze_optimization.py
+test_prompt.py
