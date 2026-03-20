@@ -1,29 +1,27 @@
 "use client";
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSignUpSuccessLogic } from '@/lib/SignUpSuccess';
 
-interface SuccessProps {
-  firstName: string;
-  surname: string;
-  username: string;
-  email: string;
-}
+export default function SignUpSuccess() {
+  // Destructure data from the logic hook
+  const { firstName, surname, username, email } = useSignUpSuccessLogic();
 
-export default function SignUpSuccess({ firstName, surname, username, email }: SuccessProps) {
   return (
     /* This container ensures the card stays exactly 450px wide, matching your Signup form */
-    <div className="w-[450px] bg-white rounded-3xl shadow-xl p-10 flex flex-col items-center">
+    <div className="w-[450px] bg-white rounded-3xl shadow-xl p-10 flex flex-col items-center mx-auto">
       
-        {/* NYAYA Logo */}
-        <div className="flex justify-center mb-4">
-            <Image 
-                src="/Nyaya_logo_temp.png"
-                alt="NYAYA Logo" 
-                width={80}           
-                height={80}          
-                className="rounded-full shadow-sm" 
-            />
-        </div>
+      {/* NYAYA Logo */}
+      <div className="flex justify-center mb-4">
+        <Image 
+          src="/Nyaya_logo_temp.png"
+          alt="NYAYA Logo" 
+          width={80}           
+          height={80}          
+          className="rounded-full shadow-sm" 
+        />
+      </div>
 
       <h2 className="text-2xl font-bold text-[#1a2b4b] mb-1">User Created!</h2>
       <p className="text-gray-400 text-sm mb-8">Your Nyaya account is ready to use.</p>
@@ -51,7 +49,7 @@ export default function SignUpSuccess({ firstName, surname, username, email }: S
       {/* Back to login Button */}
       <Link 
         href="/login" 
-        className="w-full bg-[#0f172a] hover:bg-[#c5a059] text-white font-bold py-3 rounded-xl text-center transition-all shadow-md"
+        className="w-full bg-[#0f172a] hover:bg-[#c5a059] text-white font-bold py-3 rounded-xl text-center transition-all shadow-md active:scale-95"
       >
         Login to Nyaya
       </Link>
