@@ -575,7 +575,7 @@ def get_all_quizzes():
     db = SessionLocal()
     try:
         quizzes_result = db.execute(sql_text("""
-            SELECT id, title, description, created_at
+            SELECT id, title, description, difficulty, duration_minutes, created_at
             FROM quizzes2
             ORDER BY created_at DESC
         """)).mappings().all()
@@ -586,7 +586,7 @@ def get_all_quizzes():
             quiz_dict['id'] = str(quiz_dict['id'])
 
             questions_result = db.execute(sql_text("""
-                SELECT id, question_text
+                SELECT id, question_text, explanation
                 FROM questions
                 WHERE quiz_id = :quiz_id
             """), {"quiz_id": quiz['id']}).mappings().all()
@@ -595,6 +595,7 @@ def get_all_quizzes():
             for question in questions_result:
                 q_dict = dict(question)
                 q_dict['id'] = str(q_dict['id'])
+                q_dict['explanation'] = q_dict.get('explanation', '')
 
                 options_result = db.execute(sql_text("""
                     SELECT option_text, is_correct
@@ -612,6 +613,8 @@ def get_all_quizzes():
 
             quiz_dict['questions'] = questions
             quiz_dict['question_count'] = len(questions)
+            quiz_dict['difficulty'] = quiz_dict.get('difficulty', 'Medium')
+            quiz_dict['duration_minutes'] = quiz_dict.get('duration_minutes', 10)
             quizzes.append(quiz_dict)
 
         return quizzes
@@ -627,7 +630,7 @@ def get_quiz(quiz_id: str):
     db = SessionLocal()
     try:
         quiz_result = db.execute(sql_text("""
-            SELECT id, title, description, created_at
+            SELECT id, title, description, difficulty, duration_minutes, created_at
             FROM quizzes2
             WHERE id = :id
         """), {"id": quiz_id}).mappings().first()
@@ -637,9 +640,11 @@ def get_quiz(quiz_id: str):
 
         quiz = dict(quiz_result)
         quiz['id'] = str(quiz['id'])
+        quiz['difficulty'] = quiz.get('difficulty', 'Medium')
+        quiz['duration_minutes'] = quiz.get('duration_minutes', 10)
 
         questions_result = db.execute(sql_text("""
-            SELECT id, question_text
+            SELECT id, question_text, explanation
             FROM questions
             WHERE quiz_id = :quiz_id
         """), {"quiz_id": quiz_id}).mappings().all()
@@ -648,6 +653,7 @@ def get_quiz(quiz_id: str):
         for question in questions_result:
             q_dict = dict(question)
             q_dict['id'] = str(q_dict['id'])
+            q_dict['explanation'] = q_dict.get('explanation', '')
 
             options_result = db.execute(sql_text("""
                 SELECT option_text, is_correct
