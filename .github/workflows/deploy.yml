@@ -3,57 +3,45 @@ name: Deploy to Production
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
       with:
-        python-version: "3.11"
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Build application
-      run: |
-        echo "Building Nyaya Legal Citation System..."
-        python -m py_compile agent/*.py pipeline/*.py
-        echo "[OK] Build successful"
-
-    - name: Create Release notes
-      if: startsWith(github.ref, 'refs/tags/')
-      run: |
-        echo "# Release $(basename ${{ github.ref }})" > RELEASE_NOTES.md
-        echo "Build: $(date)" >> RELEASE_NOTES.md
-        echo "Commit: ${{ github.sha }}" >> RELEASE_NOTES.md
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v6
       with:
-        name: nyaya-app
-        path: |
-          agent/
-          pipeline/
-          requirements.txt
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/nyaya:${{ github.sha }}
+          ghcr.io/${{ github.repository_owner }}/nyaya:latest
 
-    - name: Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: RELEASE_NOTES.md
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Trigger Render deploy hook
+      if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+      run: |
+        curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-    # TODO: Add Docker push, K8s deployment, or cloud deployment here
-    # - name: Build and push Docker image
-    #   run: docker build -t nyaya:${{ github.sha }} .
-    # - name: Deploy to cloud
-    #   run: echo "Deploy to AWS/Azure/GCP"
+    - name: Deployment status note
+      if: ${{ secrets.RENDER_DEPLOY_HOOK_URL == '' }}
+      run: |
+        echo "No RENDER_DEPLOY_HOOK_URL secret configured."
+        echo "Image was built and pushed to GHCR successfully."

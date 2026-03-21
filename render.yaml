@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: nyaya-api
+    env: docker
+    plan: starter
+    branch: main
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://your-frontend.example.com
+      - key: NYAYA_API_KEY
+        sync: false
+      - key: NYAYA_ADMIN_API_KEY
+        sync: false
+      - key: QDRANT_HOST
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: sri_lankan_cases
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT
+        value: gpt-5-nano
+      - key: AZURE_OPENAI_API_VERSION
+        value: 2025-01-01-preview

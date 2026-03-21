@@ -33,12 +33,20 @@ logger = logging.getLogger(__name__)
 # Set NYAYA_API_KEY in .env to enable. Leave unset for open access (local dev).
 _API_KEY = os.getenv("NYAYA_API_KEY", "")
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+_ADMIN_API_KEY = os.getenv("NYAYA_ADMIN_API_KEY", "")
+_admin_api_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
 
 
 def _require_api_key(key: Optional[str] = Security(_api_key_header)) -> None:
     """FastAPI dependency: enforces X-API-Key when NYAYA_API_KEY is configured."""
     if _API_KEY and key != _API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+
+
+def _require_admin_api_key(key: Optional[str] = Security(_admin_api_key_header)) -> None:
+    """FastAPI dependency: enforces X-Admin-Key for sensitive governance endpoints."""
+    if _ADMIN_API_KEY and key != _ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing admin API key.")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -365,6 +373,12 @@ async def request_id_middleware(request: Request, call_next):
         raise
 
     response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     _log_event(
         "request_complete",
         request_id=request_id,
@@ -820,7 +834,12 @@ def update_review_status(
 
 
 @app.get("/collaboration/audit")
-def collaboration_audit(http_request: Request, limit: int = 100, _auth: None = Security(_require_api_key)):
+def collaboration_audit(
+    http_request: Request,
+    limit: int = 100,
+    _auth: None = Security(_require_api_key),
+    _admin_auth: None = Security(_require_admin_api_key),
+):
     user_id = _require_user_id(http_request)
     return {"items": collaboration_store.get_audit_events(user_id=user_id, limit=limit)}
 
@@ -831,6 +850,7 @@ def governance_purge(
     deleted_older_than_days: int = 30,
     expired_share_older_than_days: int = 7,
     _auth: None = Security(_require_api_key),
+    _admin_auth: None = Security(_require_admin_api_key),
 ):
     user_id = _require_user_id(http_request)
     return collaboration_store.purge_data(

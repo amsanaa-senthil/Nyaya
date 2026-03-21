@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+.env
+.query_cache/
+.bm25_cache/
+.git/
+.gitignore
+.vscode/
+evaluation_reports/
+pdfs/
+nyaya_analytics.db

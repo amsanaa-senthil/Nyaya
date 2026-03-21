@@ -63,3 +63,22 @@ def test_ask_stream_blocks_unsafe_query(monkeypatch):
     response = client.post("/ask-stream", json={"question": "Can I kill someone?", "history": []})
     assert response.status_code == 200
     assert "cannot provide advice" in response.text.lower()
+
+
+def test_governance_requires_admin_key(monkeypatch):
+    monkeypatch.setattr(app, "_ADMIN_API_KEY", "admin-secret")
+    client = TestClient(app.app)
+
+    response = client.post(
+        "/governance/purge",
+        headers={"X-User-ID": "owner-1"},
+    )
+    assert response.status_code == 403
+
+
+def test_health_includes_security_headers():
+    client = TestClient(app.app)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+    assert response.headers.get("x-frame-options") == "DENY"
