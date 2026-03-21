@@ -9,8 +9,9 @@ import logging
 import os
 import time
 import uuid
+from collections import deque
 from threading import Lock
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Deque, Dict, Generator, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from pydantic import BaseModel, Field
 from agent.nyaya_agent import NyayaAgent
 from agent.llm import stream_answer
 from analytics_store import AnalyticsEvent, analytics_store
+from collaboration_store import collaboration_store
 from optimizations import is_valid_query
 
 # Setup logging
@@ -106,11 +108,54 @@ class QueryResponse(BaseModel):
     groundedness_score: float = 0.0
     reflection_report: Dict[str, Any] = Field(default_factory=dict)
     latency_seconds: float = 0.0
+    citation_count: int = 0
+    evidence_sufficient: bool = False
+    legal_notice: str = "Educational information only; not legal advice."
 
 
 class HealthResponse(BaseModel):
     status: str
     version: str
+
+
+class ConversationCreateRequest(BaseModel):
+    title: str
+    tags: List[str] = Field(default_factory=list)
+    matter_id: str = ""
+    jurisdiction: str = ""
+
+
+class ConversationMessageRequest(BaseModel):
+    role: str
+    content: str
+    citations: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_score: float = 0.0
+
+
+class MessageEditRequest(BaseModel):
+    content: str
+    citations: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_score: Optional[float] = None
+
+
+class ConversationShareRequest(BaseModel):
+    permission: str = "view"
+    expires_in_hours: Optional[int] = None
+    password: Optional[str] = None
+
+
+class SharedAccessRequest(BaseModel):
+    password: Optional[str] = None
+
+
+class ConversationCommentRequest(BaseModel):
+    content: str
+    mentions: List[str] = Field(default_factory=list)
+    message_key: Optional[str] = None
+
+
+class ReviewStatusRequest(BaseModel):
+    review_status: str
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -148,6 +193,51 @@ def _validate_question(question: str) -> str:
     return cleaned
 
 
+def _extract_team_id(http_request: Request) -> Optional[str]:
+    candidate = (
+        http_request.headers.get("X-Team-ID")
+        or http_request.headers.get("X-Team-Id")
+        or http_request.headers.get("X-Team")
+    )
+    if not candidate:
+        return None
+    cleaned = candidate.strip()
+    return cleaned[:128] if cleaned else None
+
+
+def _require_user_id(http_request: Request) -> str:
+    user_id = _extract_user_id(http_request)
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing user identity header. Send X-User-ID.",
+        )
+    return user_id
+
+
+_rate_limit_per_minute = max(10, int(os.getenv("NYAYA_RATE_LIMIT_PER_MINUTE", "60")))
+_rate_windows: Dict[str, Deque[float]] = {}
+_rate_limit_lock = Lock()
+
+
+def _enforce_rate_limit(http_request: Request, endpoint: str) -> None:
+    user_key = _extract_user_id(http_request) or "anonymous"
+    team_key = _extract_team_id(http_request) or "public"
+    composite = f"{team_key}:{user_key}:{endpoint}"
+    now = time.time()
+    cutoff = now - 60.0
+    with _rate_limit_lock:
+        window = _rate_windows.setdefault(composite, deque())
+        while window and window[0] < cutoff:
+            window.popleft()
+        if len(window) >= _rate_limit_per_minute:
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded. Please retry in a minute.",
+            )
+        window.append(now)
+
+
 def _build_query_response(question: str, report: Dict[str, Any]) -> QueryResponse:
     answer = report.get("answer", "")
     status = report.get("status", "success")
@@ -160,6 +250,9 @@ def _build_query_response(question: str, report: Dict[str, Any]) -> QueryRespons
         groundedness_score=_to_float(report.get("groundedness_score", 0.0), 0.0),
         reflection_report=_to_dict(report.get("reflection_report", {})),
         latency_seconds=_to_float(report.get("latency_seconds", 0.0), 0.0),
+        citation_count=len(_to_list_of_dict(report.get("source_map", []))),
+        evidence_sufficient=_to_float(report.get("groundedness_score", 0.0), 0.0) >= 0.5,
+        legal_notice="Educational information only; not legal advice.",
     )
 
 
@@ -310,6 +403,7 @@ def ask_legal_question(request: QueryRequest, http_request: Request, _auth: None
         HTTPException 500: LLM or retrieval error
     """
     question = _validate_question(request.question)
+    _enforce_rate_limit(http_request, "/ask")
     
     try:
         request_id = getattr(http_request.state, "request_id", "unknown")
@@ -332,6 +426,7 @@ def ask_chat(request: ChatRequest, http_request: Request, _auth: None = Security
     Returns a full QueryResponse identical to /ask.
     """
     question = _validate_question(request.question)
+    _enforce_rate_limit(http_request, "/ask-chat")
 
     history = [{"role": t.role, "content": t.content} for t in request.history]
 
@@ -351,6 +446,7 @@ def ask_stream(request: ChatRequest, http_request: Request, _auth: None = Securi
     Pass optional 'history' list of {role, content} for multi-turn context.
     """
     question = _validate_question(request.question)
+    _enforce_rate_limit(http_request, "/ask-stream")
     request_id = getattr(http_request.state, "request_id", "unknown")
     user_id = _extract_user_id(http_request)
 
@@ -429,6 +525,7 @@ def ask_batch(requests: list[QueryRequest], http_request: Request, _auth: None =
         List of QueryResponse objects
     """
     results = []
+    _enforce_rate_limit(http_request, "/ask-batch")
     request_id = getattr(http_request.state, "request_id", "unknown")
     for req in requests:
         try:
@@ -489,12 +586,7 @@ def analytics_dashboard():
 
 @app.get("/history")
 def get_history(http_request: Request, limit: int = 50):
-    user_id = _extract_user_id(http_request)
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing user identity header. Send X-User-ID.",
-        )
+    user_id = _require_user_id(http_request)
     return {
         "user_id": user_id,
         "items": analytics_store.get_user_history(user_id, limit=limit),
@@ -503,14 +595,249 @@ def get_history(http_request: Request, limit: int = 50):
 
 @app.delete("/history")
 def clear_history(http_request: Request):
-    user_id = _extract_user_id(http_request)
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing user identity header. Send X-User-ID.",
-        )
+    user_id = _require_user_id(http_request)
     deleted = analytics_store.clear_user_history(user_id)
     return {"user_id": user_id, "deleted": deleted}
+
+
+@app.post("/conversations")
+def create_conversation(request: ConversationCreateRequest, http_request: Request, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    created = collaboration_store.create_conversation(
+        owner_user_id=user_id,
+        title=request.title,
+        tags=request.tags,
+        matter_id=request.matter_id,
+        jurisdiction=request.jurisdiction,
+    )
+    return created
+
+
+@app.get("/conversations")
+def list_conversations(http_request: Request, limit: int = 50, include_deleted: bool = False, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    return {
+        "items": collaboration_store.list_conversations(
+            owner_user_id=user_id,
+            include_deleted=include_deleted,
+            limit=limit,
+        )
+    }
+
+
+@app.get("/conversations/{conversation_id}")
+def get_conversation(conversation_id: str, http_request: Request, include_history: bool = False, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.get_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            include_history=include_history,
+            include_deleted=False,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, http_request: Request, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    try:
+        collaboration_store.soft_delete_conversation(user_id=user_id, conversation_id=conversation_id)
+        return {"conversation_id": conversation_id, "deleted": True}
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/conversations/{conversation_id}/messages")
+def add_conversation_message(
+    conversation_id: str,
+    request: ConversationMessageRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.add_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role=request.role,
+            content=request.content,
+            citations=request.citations,
+            evidence_score=request.evidence_score,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.patch("/conversations/{conversation_id}/messages/{message_key}")
+def edit_conversation_message(
+    conversation_id: str,
+    message_key: str,
+    request: MessageEditRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.edit_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_key=message_key,
+            content=request.content,
+            citations=request.citations,
+            evidence_score=request.evidence_score,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/conversations/{conversation_id}/share")
+def create_share_link(
+    conversation_id: str,
+    request: ConversationShareRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.create_share_link(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            permission=request.permission,
+            expires_in_hours=request.expires_in_hours,
+            password=request.password,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/shares/{share_token}/access")
+def access_shared_conversation(
+    share_token: str,
+    request: SharedAccessRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    accessor = _extract_user_id(http_request) or "share-access-user"
+    try:
+        return collaboration_store.access_shared_conversation(
+            accessor_user_id=accessor,
+            share_token=share_token,
+            password=request.password,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/conversations/{conversation_id}/share/{share_token}/revoke")
+def revoke_share_link(
+    conversation_id: str,
+    share_token: str,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.revoke_share(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            share_token=share_token,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/conversations/{conversation_id}/export")
+def export_conversation(conversation_id: str, http_request: Request, include_history: bool = False, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.export_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            include_history=include_history,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/conversations/{conversation_id}/comments")
+def add_conversation_comment(
+    conversation_id: str,
+    request: ConversationCommentRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.add_comment(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            content=request.content,
+            mentions=request.mentions,
+            message_key=request.message_key,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.patch("/conversations/{conversation_id}/review-status")
+def update_review_status(
+    conversation_id: str,
+    request: ReviewStatusRequest,
+    http_request: Request,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    try:
+        return collaboration_store.set_review_status(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            review_status=request.review_status,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/collaboration/audit")
+def collaboration_audit(http_request: Request, limit: int = 100, _auth: None = Security(_require_api_key)):
+    user_id = _require_user_id(http_request)
+    return {"items": collaboration_store.get_audit_events(user_id=user_id, limit=limit)}
+
+
+@app.post("/governance/purge")
+def governance_purge(
+    http_request: Request,
+    deleted_older_than_days: int = 30,
+    expired_share_older_than_days: int = 7,
+    _auth: None = Security(_require_api_key),
+):
+    user_id = _require_user_id(http_request)
+    return collaboration_store.purge_data(
+        user_id=user_id,
+        deleted_older_than_days=deleted_older_than_days,
+        expired_share_older_than_days=expired_share_older_than_days,
+    )
 
 
 # Info endpoint
@@ -527,6 +854,18 @@ def get_info():
             "ask_chat": "POST /ask-chat (multi-turn, pass history[])",
             "ask_stream": "POST /ask-stream (token streaming)",
             "batch": "POST /ask-batch",
+            "conversations": "POST/GET /conversations",
+            "conversation_detail": "GET/DELETE /conversations/{conversation_id}",
+            "conversation_messages": "POST /conversations/{conversation_id}/messages",
+            "conversation_message_edit": "PATCH /conversations/{conversation_id}/messages/{message_key}",
+            "conversation_share": "POST /conversations/{conversation_id}/share",
+            "share_access": "POST /shares/{share_token}/access",
+            "share_revoke": "POST /conversations/{conversation_id}/share/{share_token}/revoke",
+            "conversation_export": "GET /conversations/{conversation_id}/export",
+            "conversation_comments": "POST /conversations/{conversation_id}/comments",
+            "review_status": "PATCH /conversations/{conversation_id}/review-status",
+            "collaboration_audit": "GET /collaboration/audit",
+            "governance_purge": "POST /governance/purge",
             "info": "GET /info",
             "docs": "GET /docs"
         },
@@ -540,6 +879,12 @@ def get_info():
             "Optional API key auth (set NYAYA_API_KEY)",
             "Query validation and fallback handling",
             "SQLite-backed analytics persistence",
+            "Conversation sharing (view/comment/edit) with expiry/revoke",
+            "Message versioning and review workflow states",
+            "Conversation comments with mentions",
+            "Conversation export for handoff/audit",
+            "Collaboration audit log and retention purge endpoint",
+            "Per-user/team endpoint rate limiting",
         ]
     }
 
