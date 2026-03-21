@@ -42,19 +42,19 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov flake8 pylint
+        python -m pip install -r requirements.txt
+        python -m pip install pytest pytest-cov flake8 pylint
 
     - name: Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
-        flake8 agent pipeline tests app.py main.py query.py evaluate.py --count --select=E9,F63,F7,F82 --show-source --statistics
+        python -m flake8 agent pipeline tests app.py main.py query.py evaluate.py --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings
-        flake8 agent pipeline tests app.py main.py query.py evaluate.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        python -m flake8 agent pipeline tests app.py main.py query.py evaluate.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
     - name: Run unit tests
       run: |
-        pytest tests/ -v \
+        python -m pytest tests/ -v \
           --ignore=tests/test_hybrid.py \
           --ignore=tests/test_retrieval_only.py \
           --ignore=tests/test_case_router.py \
