@@ -17,12 +17,15 @@ interface Option {
 
 interface Question {
   text: string;
+  explanation: string;
   options: Option[];
 }
 
 interface NewQuizForm {
   title: string;
   description: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  duration_minutes: number;
   questions: Question[];
 }
 
@@ -30,6 +33,8 @@ interface Quiz {
   id: string;
   title: string;
   description: string;
+  difficulty: string;
+  duration_minutes: number;
   created_at: string;
   question_count: number;
 }
@@ -38,6 +43,7 @@ interface Quiz {
 function emptyQuestion(): Question {
   return {
     text: "",
+    explanation: "",
     options: [
       { text: "", is_correct: true },
       { text: "", is_correct: false },
@@ -48,7 +54,13 @@ function emptyQuestion(): Question {
 }
 
 function emptyForm(): NewQuizForm {
-  return { title: "", description: "", questions: [emptyQuestion()] };
+  return {
+    title: "",
+    description: "",
+    difficulty: "Medium",
+    duration_minutes: 10,
+    questions: [emptyQuestion()],
+  };
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -57,18 +69,15 @@ export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Quiz list
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [quizzesLoading, setQuizzesLoading] = useState(true);
   const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null);
 
-  // Add quiz form
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NewQuizForm>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Delete
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ── Auth check ──────────────────────────────────────────────────────────────
@@ -99,7 +108,7 @@ export default function AdminDashboard() {
     setQuizzesLoading(true);
     const { data: quizData } = await supabase
       .from("quizzes2")
-      .select("id, title, description, created_at")
+      .select("id, title, description, difficulty, duration_minutes, created_at")
       .order("created_at", { ascending: false });
 
     if (quizData) {
@@ -121,7 +130,6 @@ export default function AdminDashboard() {
   async function handleDelete(quizId: string) {
     if (!confirm("Are you sure you want to delete this quiz? This cannot be undone.")) return;
     setDeletingId(quizId);
-    // CASCADE deletes questions + options automatically
     await supabase.from("quizzes2").delete().eq("id", quizId);
     setQuizzes(prev => prev.filter(q => q.id !== quizId));
     setDeletingId(null);
@@ -132,6 +140,14 @@ export default function AdminDashboard() {
     setForm(f => {
       const qs = [...f.questions];
       qs[qi] = { ...qs[qi], text };
+      return { ...f, questions: qs };
+    });
+  }
+
+  function updateExplanation(qi: number, explanation: string) {
+    setForm(f => {
+      const qs = [...f.questions];
+      qs[qi] = { ...qs[qi], explanation };
       return { ...f, questions: qs };
     });
   }
@@ -167,7 +183,6 @@ export default function AdminDashboard() {
   async function handleSubmit() {
     setSubmitMsg(null);
 
-    // Validate
     if (!form.title.trim()) {
       setSubmitMsg({ type: "error", text: "Quiz title is required." });
       return;
@@ -190,20 +205,27 @@ export default function AdminDashboard() {
 
     setSubmitting(true);
     try {
-      // 1. Insert quiz
       const { data: quiz, error: quizError } = await supabase
         .from("quizzes2")
-        .insert({ title: form.title.trim(), description: form.description.trim() })
+        .insert({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          difficulty: form.difficulty,
+          duration_minutes: form.duration_minutes,
+        })
         .select()
         .single();
 
       if (quizError || !quiz) throw new Error(quizError?.message || "Failed to create quiz");
 
-      // 2. Insert questions + options
       for (const q of form.questions) {
         const { data: question, error: qError } = await supabase
           .from("questions")
-          .insert({ quiz_id: quiz.id, question_text: q.text.trim() })
+          .insert({
+            quiz_id: quiz.id,
+            question_text: q.text.trim(),
+            explanation: q.explanation.trim(),
+          })
           .select()
           .single();
 
@@ -238,7 +260,6 @@ export default function AdminDashboard() {
     router.push("/login");
   }
 
-  // ── Loading / auth gate ─────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -248,6 +269,12 @@ export default function AdminDashboard() {
   }
 
   if (!isAdmin) return null;
+
+  const difficultyColors: Record<string, string> = {
+    Easy: "bg-green-50 text-green-700",
+    Medium: "bg-yellow-50 text-yellow-700",
+    Hard: "bg-red-50 text-red-700",
+  };
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -295,9 +322,7 @@ export default function AdminDashboard() {
               ? "bg-green-50 border-green-200 text-green-800"
               : "bg-red-50 border-red-200 text-red-800"
           }`}>
-            {submitMsg.type === "success"
-              ? <CheckCircle size={20} />
-              : <XCircle size={20} />}
+            {submitMsg.type === "success" ? <CheckCircle size={20} /> : <XCircle size={20} />}
             {submitMsg.text}
           </div>
         )}
@@ -331,6 +356,33 @@ export default function AdminDashboard() {
               />
             </div>
 
+            {/* Difficulty + Duration */}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Difficulty</label>
+                <select
+                  value={form.difficulty}
+                  onChange={e => setForm(f => ({ ...f, difficulty: e.target.value as any }))}
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-gray-800 bg-white"
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Time (minutes)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={form.duration_minutes}
+                  onChange={e => setForm(f => ({ ...f, duration_minutes: parseInt(e.target.value) || 10 }))}
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-gray-800"
+                />
+              </div>
+            </div>
+
             {/* Questions */}
             <div className="space-y-6">
               <h3 className="font-semibold text-gray-700">Questions</h3>
@@ -342,10 +394,7 @@ export default function AdminDashboard() {
                       Question {qi + 1}
                     </span>
                     {form.questions.length > 1 && (
-                      <button
-                        onClick={() => removeQuestion(qi)}
-                        className="text-red-400 hover:text-red-600 transition"
-                      >
+                      <button onClick={() => removeQuestion(qi)} className="text-red-400 hover:text-red-600 transition">
                         <Trash2 size={16} />
                       </button>
                     )}
@@ -358,6 +407,15 @@ export default function AdminDashboard() {
                     onChange={e => updateQuestion(qi, e.target.value)}
                     placeholder="Enter question text..."
                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-gray-800 bg-white"
+                  />
+
+                  {/* Explanation */}
+                  <input
+                    type="text"
+                    value={q.explanation}
+                    onChange={e => updateExplanation(qi, e.target.value)}
+                    placeholder="Explanation shown after answer is selected..."
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#c5a059] outline-none text-gray-800 bg-white text-sm"
                   />
 
                   {/* Options */}
@@ -375,9 +433,7 @@ export default function AdminDashboard() {
                               : "border-gray-300 hover:border-[#c5a059]"
                           }`}
                         >
-                          {opt.is_correct && (
-                            <div className="w-2.5 h-2.5 rounded-full bg-white" />
-                          )}
+                          {opt.is_correct && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                         </button>
                         <input
                           type="text"
@@ -443,7 +499,12 @@ export default function AdminDashboard() {
               <div key={quiz.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between p-5">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-[#0f172a] text-lg truncate">{quiz.title}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-[#0f172a] text-lg truncate">{quiz.title}</h3>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${difficultyColors[quiz.difficulty] || "bg-gray-100 text-gray-600"}`}>
+                        {quiz.difficulty}
+                      </span>
+                    </div>
                     {quiz.description && (
                       <p className="text-gray-500 text-sm mt-0.5 truncate">{quiz.description}</p>
                     )}
@@ -451,6 +512,7 @@ export default function AdminDashboard() {
                       <span className="text-xs text-gray-400">
                         {quiz.question_count} question{quiz.question_count !== 1 ? "s" : ""}
                       </span>
+                      <span className="text-xs text-gray-400">{quiz.duration_minutes} min</span>
                       <span className="text-xs text-gray-400">
                         Created {new Date(quiz.created_at).toLocaleDateString("en-US", {
                           month: "short", day: "numeric", year: "numeric"
@@ -463,7 +525,6 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => setExpandedQuiz(expandedQuiz === quiz.id ? null : quiz.id)}
                       className="p-2 text-gray-400 hover:text-[#0f172a] hover:bg-gray-50 rounded-lg transition"
-                      title="View details"
                     >
                       {expandedQuiz === quiz.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
@@ -472,18 +533,13 @@ export default function AdminDashboard() {
                       disabled={deletingId === quiz.id}
                       className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50"
                     >
-                      {deletingId === quiz.id
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : <Trash2 size={14} />}
+                      {deletingId === quiz.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                       Delete
                     </button>
                   </div>
                 </div>
 
-                {/* Expanded quiz details */}
-                {expandedQuiz === quiz.id && (
-                  <QuizDetails quizId={quiz.id} />
-                )}
+                {expandedQuiz === quiz.id && <QuizDetails quizId={quiz.id} />}
               </div>
             ))
           )}
@@ -493,7 +549,7 @@ export default function AdminDashboard() {
   );
 }
 
-// ── Quiz Details (questions preview) ─────────────────────────────────────────
+// ── Quiz Details ──────────────────────────────────────────────────────────────
 function QuizDetails({ quizId }: { quizId: string }) {
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -502,7 +558,7 @@ function QuizDetails({ quizId }: { quizId: string }) {
     async function load() {
       const { data: qs } = await supabase
         .from("questions")
-        .select("id, question_text")
+        .select("id, question_text, explanation")
         .eq("quiz_id", quizId);
 
       if (qs) {
@@ -535,16 +591,12 @@ function QuizDetails({ quizId }: { quizId: string }) {
     <div className="border-t border-gray-100 p-5 bg-gray-50 space-y-4">
       {questions.map((q, i) => (
         <div key={q.id} className="bg-white rounded-xl p-4 border border-gray-100">
-          <p className="text-xs font-bold text-[#c5a059] uppercase tracking-wider mb-2">
-            Question {i + 1}
-          </p>
+          <p className="text-xs font-bold text-[#c5a059] uppercase tracking-wider mb-2">Question {i + 1}</p>
           <p className="font-medium text-[#0f172a] mb-3">{q.question_text}</p>
           <div className="space-y-1.5">
             {q.options.map((opt: any, oi: number) => (
               <div key={oi} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
-                opt.is_correct
-                  ? "bg-green-50 text-green-800 font-medium"
-                  : "text-gray-600"
+                opt.is_correct ? "bg-green-50 text-green-800 font-medium" : "text-gray-600"
               }`}>
                 {opt.is_correct
                   ? <CheckCircle size={14} className="text-green-600 flex-shrink-0" />
@@ -553,6 +605,9 @@ function QuizDetails({ quizId }: { quizId: string }) {
               </div>
             ))}
           </div>
+          {q.explanation && (
+            <p className="text-xs text-gray-500 mt-3 italic px-1">💡 {q.explanation}</p>
+          )}
         </div>
       ))}
     </div>
