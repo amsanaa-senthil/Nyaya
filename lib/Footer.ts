@@ -34,36 +34,7 @@ export function useFooterLogic() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  /**
-   * handleSubmit:
-   * Handles the form submission logic. Currently simulates an API call.
-   */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setStatus(null); // Clear previous status
 
-    try {
-      // Logic for sending message (e.g., Supabase, EmailJS, or an API route)
-      // Simulating a network delay of 1.5 seconds
-      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // On success: update UI and reset the form
-      setStatus({
-        type: "success",
-        msg: "Message sent! We'll get back to you soon.",
-      });
-      setFormData({ name: "", phone: "", email: "", message: "" });
-    } catch (error) {
-      // On failure: notify the user
-      setStatus({
-        type: "error",
-        msg: "Something went wrong. Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return { formData, handleChange, handleSubmit, isSubmitting, status };
+  return { formData, handleChange, isSubmitting, status };
 }
