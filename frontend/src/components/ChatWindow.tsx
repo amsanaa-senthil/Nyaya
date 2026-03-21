@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
-import { SearchMode } from './ModeToggle';
 import { User } from 'lucide-react';
 import Link from 'next/link';
 
@@ -18,7 +17,7 @@ export interface Message {
 interface ChatWindowProps {
     messages: Message[];
     isTyping: boolean;
-    onSendMessage: (content: string, mode: SearchMode) => void;
+    onSendMessage: (content: string) => void;
 }
 
 export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWindowProps) {
@@ -31,8 +30,8 @@ export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWi
         }
     }, [messages, isTyping]);
 
-    const handleSend = (content: string, mode: SearchMode) => {
-        onSendMessage(content, mode);
+    const handleSend = (content: string) => {
+        onSendMessage(content);
     };
 
     return (
@@ -72,7 +71,7 @@ export default function ChatWindow({ messages, isTyping, onSendMessage }: ChatWi
                     </div>
                 ) : (
                     <div className="p-4 md:p-8 pt-24">
-                        <div className="max-w-3xl mx-auto flex flex-col gap-6 ">
+                        <div className="max-w-3xl mx-auto flex flex-col gap-6">
                             <AnimatePresence>
                                 {messages.map((msg) => (
                                     <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
