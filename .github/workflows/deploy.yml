@@ -1,0 +1,59 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Build application
+      run: |
+        echo "Building Nyaya Legal Citation System..."
+        python -m py_compile agent/*.py pipeline/*.py
+        echo "[OK] Build successful"
+
+    - name: Create Release notes
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        echo "# Release $(basename ${{ github.ref }})" > RELEASE_NOTES.md
+        echo "Build: $(date)" >> RELEASE_NOTES.md
+        echo "Commit: ${{ github.sha }}" >> RELEASE_NOTES.md
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: nyaya-app
+        path: |
+          agent/
+          pipeline/
+          requirements.txt
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: RELEASE_NOTES.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # TODO: Add Docker push, K8s deployment, or cloud deployment here
+    # - name: Build and push Docker image
+    #   run: docker build -t nyaya:${{ github.sha }} .
+    # - name: Deploy to cloud
+    #   run: echo "Deploy to AWS/Azure/GCP"

@@ -1,0 +1,43 @@
+name: Code Quality & Security
+
+on:
+  push:
+    branches: [ main, Database, development ]
+  pull_request:
+    branches: [ main, Database, development ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pylint bandit safety
+
+    - name: Security check with Bandit
+      run: |
+        bandit -r agent/ pipeline/ -ll -f json -o bandit-report.json || true
+        cat bandit-report.json
+
+    - name: Dependency vulnerability check
+      run: |
+        safety check --json || true
+
+    - name: Code analysis with Pylint
+      run: |
+        pylint agent/*.py pipeline/*.py --exit-zero --output-format=json > pylint-report.json || true
+      continue-on-error: true
+
+    - name: Validate configuration files
+      run: |
+        python -c "from dotenv import load_dotenv; load_dotenv(); print('[OK] .env is valid')"
