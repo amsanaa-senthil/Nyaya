@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 
 export function useSignUpLogic() {
-
   const router = useRouter();
 
   //State object to hold all form data
@@ -15,7 +14,7 @@ export function useSignUpLogic() {
     username: "",
     email: "",
     password: "",
-    confirmPassword:""
+    confirmPassword: "",
   });
 
   //State to toggle password visibility
@@ -24,8 +23,8 @@ export function useSignUpLogic() {
 
   const [errorMsg, setErrorMsg] = useState(""); // State to store the error text
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const [strength, setStrength] = useState(0);
 
@@ -47,7 +46,9 @@ export function useSignUpLogic() {
     // Validate Username: No '@' allowed
     if (formData.username.includes("@")) {
       //Setting up the appropriate error message to display in the UI
-      setErrorMsg("Usernames cannot contain the '@' symbol. Please choose another.");
+      setErrorMsg(
+        "Usernames cannot contain the '@' symbol. Please choose another.",
+      );
       return;
     }
 
@@ -64,52 +65,58 @@ export function useSignUpLogic() {
       return;
     }
 
-  const { data, error } = await supabase.auth.signUp({
-    email: formData.email,
-    password: formData.password,
-    options: {
-      data: {
-        first_name: formData.firstName,
-        surname: formData.surname,
-        username: formData.username,
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          first_name: formData.firstName,
+          surname: formData.surname,
+          username: formData.username,
+        },
       },
-    },
-  });
+    });
 
-  if (error) {
-    // This will catch "User already registered", "Password too short", etc.
-    setErrorMsg(error.message); 
-    return; // Stop the code here so it doesn't redirect!
-  }
+    if (error) {
+      // This will catch "User already registered", "Password too short", etc.
+      setErrorMsg(error.message);
+      return; // Stop the code here so it doesn't redirect!
+    }
 
-  // Supabase "Fake Success" Check:
-  // If email confirmation is ON, Supabase returns data but no session.
-  // If the user already exists, sometimes 'data.user' is null or identities are empty.
-  if (data.user && data.user.identities && data.user.identities.length === 0) {
-    //Setting up the appropriate error message to display in the UI
-    setErrorMsg("This email is already in use. Please try logging in.");
-    return;
-  }
+    // Supabase "Fake Success" Check:
+    // If email confirmation is ON, Supabase returns data but no session.
+    // If the user already exists, sometimes 'data.user' is null or identities are empty.
+    if (
+      data.user &&
+      data.user.identities &&
+      data.user.identities.length === 0
+    ) {
+      //Setting up the appropriate error message to display in the UI
+      setErrorMsg("This email is already in use. Please try logging in.");
+      return;
+    }
 
-  // ONLY redirect if there was no error and it's a new user
-  const queryString = new URLSearchParams({
-    firstName: formData.firstName,
-    surname: formData.surname,
-    username: formData.username,
-    email: formData.email,
-  }).toString();
+    // ONLY redirect if there was no error and it's a new user
+    const queryString = new URLSearchParams({
+      firstName: formData.firstName,
+      surname: formData.surname,
+      username: formData.username,
+      email: formData.email,
+    }).toString();
 
-  router.push(`/signup_success?${queryString}`);
-};
+    router.push(`/signup_success?${queryString}`);
+  };
 
-return {
+  return {
     formData,
     handleChange,
     strength,
     checkStrength,
-    showPassword, setShowPassword,
-    showConfirmPassword, setShowConfirmPassword,
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
     errorMsg,
-    handleSubmit
+    handleSubmit,
   };
 }

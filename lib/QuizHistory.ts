@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient"; 
+import { supabase } from "../lib/supabaseClient";
 
 /**
  * QuizHistory Component
@@ -14,7 +14,9 @@ export function useQuizHistoryLogic() {
 
   // --- MODAL STATES FOR DELETING HISTORY ---
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteStep, setDeleteStep] = useState<"confirm" | "password">("confirm");
+  const [deleteStep, setDeleteStep] = useState<"confirm" | "password">(
+    "confirm",
+  );
   const [deletePassword, setDeletePassword] = useState("");
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -22,7 +24,9 @@ export function useQuizHistoryLogic() {
 
   const fetchHistory = async () => {
     // 1. Identify the current user session
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     // 2. Query the 'quiz_history' table
@@ -38,7 +42,7 @@ export function useQuizHistoryLogic() {
     } else {
       console.error("Error fetching quiz history:", error.message);
     }
-    
+
     setLoading(false);
   };
 
@@ -52,7 +56,9 @@ export function useQuizHistoryLogic() {
     setErrorMsg("");
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user?.email) throw new Error("User session not found.");
 
       // 1. Verify Password by trying to sign in
@@ -85,7 +91,7 @@ export function useQuizHistoryLogic() {
           highest_score: 0,
           lowest_score: 0,
           time_spent_per_quiz_seconds: 0,
-          total_quizzing_time_seconds: 0
+          total_quizzing_time_seconds: 0,
         })
         .eq("id", user.id);
 
@@ -96,7 +102,6 @@ export function useQuizHistoryLogic() {
       setDeleteStep("confirm");
       setDeletePassword("");
       fetchHistory(); // Refresh the list (will show empty state)
-      
     } catch (err: any) {
       setErrorMsg(err.message || "An error occurred while resetting data.");
     } finally {
@@ -107,13 +112,17 @@ export function useQuizHistoryLogic() {
   return {
     history,
     loading,
-    isDeleteModalOpen, setIsDeleteModalOpen,
-    deleteStep, setDeleteStep,
-    deletePassword, setDeletePassword,
-    showDeletePassword, setShowDeletePassword,
+    isDeleteModalOpen,
+    setIsDeleteModalOpen,
+    deleteStep,
+    setDeleteStep,
+    deletePassword,
+    setDeletePassword,
+    showDeletePassword,
+    setShowDeletePassword,
     isDeleting,
-    errorMsg, setErrorMsg,
-    handleResetHistory
+    errorMsg,
+    setErrorMsg,
+    handleResetHistory,
   };
 }
-

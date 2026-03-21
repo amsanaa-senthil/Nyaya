@@ -21,10 +21,10 @@ export function useUpdatePassword() {
   // Function to calculate strength score (0 to 4)
   const checkStrength = (pw: string) => {
     let score = 0;
-    if (pw.length >= 6) score++; 
-    if (pw.length >= 10) score++; 
-    if (/[0-9]/.test(pw)) score++; 
-    if (/[!@#$%^&*]/.test(pw)) score++; 
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[!@#$%^&*]/.test(pw)) score++;
     setStrength(score);
   };
 
@@ -52,7 +52,7 @@ export function useUpdatePassword() {
 
     // Supabase built-in method to update user credentials
     const { error } = await supabase.auth.updateUser({
-      password: password
+      password: password,
     });
 
     if (error) {
@@ -62,9 +62,9 @@ export function useUpdatePassword() {
     } else {
       //Setiing the appropriate error message to display in the UI
       setErrorMsg("Password updated successfully!");
-      
+
       /** * Best Practice: Log the user out after a reset.
-       * This clears the temporary recovery session and forces a fresh login 
+       * This clears the temporary recovery session and forces a fresh login
        * with the new credentials for security.
        */
       await supabase.auth.signOut();
@@ -74,12 +74,19 @@ export function useUpdatePassword() {
 
   // This returns the "Backend" data to the "Frontend"
   return {
-    password, setPassword,
-    confirmPassword, setConfirmPassword,
-    loading, strength,
-    errorMsg, setErrorMsg,
-    showPassword, setShowPassword,
-    showConfirmPassword, setShowConfirmPassword,
-    checkStrength, handleUpdate
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    loading,
+    strength,
+    errorMsg,
+    setErrorMsg,
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
+    checkStrength,
+    handleUpdate,
   };
 }

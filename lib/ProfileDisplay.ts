@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 export function useProfileDisplayLogic() {
   const router = useRouter();
-  
+
   // --- BACKEND LOGIC (State Management) ---
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +14,10 @@ export function useProfileDisplayLogic() {
   useEffect(() => {
     async function getProfileData() {
       // 1. Get current authenticated user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
       if (authError || !user) {
         router.push("/login");
@@ -48,6 +51,6 @@ export function useProfileDisplayLogic() {
     userProfile,
     loading,
     handleLogout,
-    router
+    router,
   };
 }

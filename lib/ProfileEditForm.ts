@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * ProfileDisplay Component:
- * This component fetches user data from Supabase and renders a read-only 
+ * This component fetches user data from Supabase and renders a read-only
  * view of the profile. This serves as the "Display State" before editing.
  */
 export function useProfileEditLogic() {
@@ -20,9 +20,11 @@ export function useProfileEditLogic() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteStep, setDeleteStep] = useState<"initial" | "confirm" | "password">("initial");
+  const [deleteStep, setDeleteStep] = useState<
+    "initial" | "confirm" | "password"
+  >("initial");
   const [showDeletePassword, setShowDeletePassword] = useState(false);
-  
+
   // profile: Local state to hold the specific fields we want to show the user
   const [profile, setProfile] = useState({
     id: "",
@@ -35,7 +37,10 @@ export function useProfileEditLogic() {
 
   // --- MODAL STATES ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingField, setEditingField] = useState<{key: string, label: string}>({ key: "", label: "" });
+  const [editingField, setEditingField] = useState<{
+    key: string;
+    label: string;
+  }>({ key: "", label: "" });
   const [newValue, setNewValue] = useState("");
 
   // Clear error message when user starts typing
@@ -48,56 +53,58 @@ export function useProfileEditLogic() {
    * 1. Checks if the user is authenticated.
    * 2. Pulls user-specific details from the PostgreSQL 'profiles' table.
    */
-    useEffect(() => {
-        const fetchUserData = async () => {
-        try {
-            // 1. Get the current user session
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            
-            if (authError || !user) {
-            console.log("Auth Error or no user:", authError);
-            router.push("/login");
-            return;
-            }
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // 1. Get the current user session
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-            // 2. Fetch the specific row from the profiles table
-            // We use '*' first to see exactly what columns exist if it fails
-            const { data, error: dbError } = await supabase
-            .from("profiles")
-            .select("*") 
-            .eq("id", user.id)
-            .single();
-
-            if (dbError) {
-            console.error("Database Error:", dbError.message);
-            return;
-            }
-
-            if (data) {
-            console.log("Supabase Data Received:", data); // Check your console for this!
-            
-            // 3. Map the data. Ensure these column names match your Supabase Table!
-            setProfile({
-                id: user.id, // Set the ID here
-                firstName: data.first_name || "Not Set",
-                surname: data.surname || "Not Set",
-                username: data.username || "Not Set",
-                email: data.email || user.email || "Not Set",
-                avatarUrl: data.avatar_url || "/Profile_Pic_Icon.png",
-            });
-            }
-        } catch (err) {
-            console.error("Unexpected Error:", err);
-        } finally {
-            setLoading(false);
+        if (authError || !user) {
+          console.log("Auth Error or no user:", authError);
+          router.push("/login");
+          return;
         }
-        };
 
-        fetchUserData();
-    
-    }, [router]);
+        // 2. Fetch the specific row from the profiles table
+        // We use '*' first to see exactly what columns exist if it fails
+        const { data, error: dbError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
 
-    const handleDeleteAccount = async () => {
+        if (dbError) {
+          console.error("Database Error:", dbError.message);
+          return;
+        }
+
+        if (data) {
+          console.log("Supabase Data Received:", data); // Check your console for this!
+
+          // 3. Map the data. Ensure these column names match your Supabase Table!
+          setProfile({
+            id: user.id, // Set the ID here
+            firstName: data.first_name || "Not Set",
+            surname: data.surname || "Not Set",
+            username: data.username || "Not Set",
+            email: data.email || user.email || "Not Set",
+            avatarUrl: data.avatar_url || "/Profile_Pic_Icon.png",
+          });
+        }
+      } catch (err) {
+        console.error("Unexpected Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  const handleDeleteAccount = async () => {
     // 1. Ensure the user actually typed something
     if (!deletePassword) {
       alert("Please enter your password to confirm.");
@@ -134,7 +141,6 @@ export function useProfileEditLogic() {
       await supabase.auth.signOut();
       alert("Account deleted successfully.");
       router.push("/signup");
-
     } catch (error: any) {
       // Display the error (e.g., "Invalid login credentials")
       setErrorMsg(error.message);
@@ -143,7 +149,7 @@ export function useProfileEditLogic() {
     }
   };
 
-// IMAGE UPLOAD LOGIC  
+  // IMAGE UPLOAD LOGIC
   const handleAvatarClick = () => {
     if (!uploadingImage) fileInputRef.current?.click();
   };
@@ -155,33 +161,32 @@ export function useProfileEditLogic() {
 
       if (!event.target.files || event.target.files.length === 0) return;
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const fileName = `avatar-${Math.random()}.${fileExt}`;
       const filePath = `${profile.id}/${fileName}`; // Folder named after User ID
 
       // 1. Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       // 2. Get Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
       // 3. Update Database profiles table
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ avatar_url: publicUrl })
-        .eq('id', profile.id);
+        .eq("id", profile.id);
 
       if (updateError) throw updateError;
 
       // 4. Update UI
       setProfile((prev) => ({ ...prev, avatarUrl: publicUrl }));
-      
     } catch (error: any) {
       setErrorMsg("Image upload failed: " + error.message);
     } finally {
@@ -189,16 +194,20 @@ export function useProfileEditLogic() {
     }
   };
 
-    /**
+  /**
    * Opens the edit modal for a specific field
    */
-  const openEditModal = (fieldKey: string, label: string, currentValue: string) => {
+  const openEditModal = (
+    fieldKey: string,
+    label: string,
+    currentValue: string,
+  ) => {
     setEditingField({ key: fieldKey, label: label });
     setNewValue(currentValue === "Not Set" ? "" : currentValue);
     setIsModalOpen(true);
   };
 
-const handleSave = async () => {
+  const handleSave = async () => {
     const trimmedValue = newValue.trim();
     setErrorMsg(""); // Reset error state
 
@@ -219,11 +228,13 @@ const handleSave = async () => {
 
       try {
         // Check for Uniqueness
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         const { data: existingUser, error: checkError } = await supabase
           .from("profiles")
           .select("id")
-          .ilike("username", trimmedValue) 
+          .ilike("username", trimmedValue)
           .neq("id", user?.id) // Don't count the current user's own name
           .maybeSingle(); // Better than .single() as it doesn't throw error if 0 found
 
@@ -240,13 +251,15 @@ const handleSave = async () => {
     // 3. Perform the actual Update
     setUpdating(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("No user session");
 
       const columnMap: Record<string, string> = {
         firstName: "first_name",
         surname: "surname",
-        username: "username"
+        username: "username",
       };
 
       const { error: dbError } = await supabase
@@ -259,7 +272,6 @@ const handleSave = async () => {
       // Update local UI and Close
       setProfile((prev) => ({ ...prev, [editingField.key]: trimmedValue }));
       setIsModalOpen(false);
-      
     } catch (error: any) {
       setErrorMsg("Error: " + error.message);
     } finally {
@@ -274,7 +286,7 @@ const handleSave = async () => {
     updating,
     errorMsg,
     uploadingImage,
-    
+
     // Modal States
     isModalOpen,
     setIsModalOpen,
@@ -299,7 +311,6 @@ const handleSave = async () => {
     handleAvatarClick,
     uploadAvatar,
     handleDeleteAccount,
-    fileInputRef // Export the ref so the UI can attach it
+    fileInputRef, // Export the ref so the UI can attach it
   };
 }
-

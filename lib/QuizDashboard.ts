@@ -21,7 +21,10 @@ export function useQuizDashboardLogic() {
   useEffect(() => {
     async function getDashboardData() {
       // 1. Get current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
       if (authError || !user) {
         router.push("/login");
@@ -31,7 +34,7 @@ export function useQuizDashboardLogic() {
       // 2. Fetch Profile and Stats from your new tables
       const [profileRes, statsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase.from("user_stats").select("*").eq("id", user.id).single()
+        supabase.from("user_stats").select("*").eq("id", user.id).single(),
       ]);
 
       setUserProfile(profileRes.data);
@@ -53,7 +56,6 @@ export function useQuizDashboardLogic() {
     loading,
     formatTime,
     handleLogout,
-    router
+    router,
   };
 }
-

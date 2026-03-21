@@ -25,10 +25,10 @@ export function useResetPasswordLogic() {
   // Function to calculate strength score (0 to 4)
   const checkStrength = (pw: string) => {
     let score = 0;
-    if (pw.length >= 6) score++; 
-    if (pw.length >= 10) score++; 
-    if (/[0-9]/.test(pw)) score++; 
-    if (/[!@#$%^&*]/.test(pw)) score++; 
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[!@#$%^&*]/.test(pw)) score++;
     setStrength(score);
   };
 
@@ -40,7 +40,7 @@ export function useResetPasswordLogic() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(""); // Clear old errors
-    
+
     // 1. Validation Checks
     if (strength < 2) {
       setErrorMsg("Password is too weak. Strength must be at least 'Fair'.");
@@ -55,50 +55,59 @@ export function useResetPasswordLogic() {
     setLoading(true);
 
     try {
-        // --- STEP 1: MANUALLY VERIFY CURRENT PASSWORD ---
-        // We try to sign in with the user's email and the current password they typed.
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        const { error: verifyError } = await supabase.auth.signInWithPassword({
-            email: user?.email || "",
-            password: currentPassword,
-        });
+      // --- STEP 1: MANUALLY VERIFY CURRENT PASSWORD ---
+      // We try to sign in with the user's email and the current password they typed.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        if (verifyError) {
-            throw new Error("Current password is incorrect.");
-        }
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user?.email || "",
+        password: currentPassword,
+      });
 
-        // --- STEP 2: UPDATE TO NEW PASSWORD ---
-        const { error: updateError } = await supabase.auth.updateUser({
-            password: password,
-        });
+      if (verifyError) {
+        throw new Error("Current password is incorrect.");
+      }
 
-        if (updateError) throw updateError;
+      // --- STEP 2: UPDATE TO NEW PASSWORD ---
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
 
-        // SUCCESS
-        setErrorMsg("Password updated successfully! Logging out...");
-        
-        setTimeout(async () => {
-            await supabase.auth.signOut();
-            router.push("/login");
-        }, 2000);
+      if (updateError) throw updateError;
 
-        } catch (error: any) {
-        setErrorMsg(error.message);
-        setLoading(false);
-        }
-    };
+      // SUCCESS
+      setErrorMsg("Password updated successfully! Logging out...");
 
-    return {
-        password, setPassword,
-        currentPassword, setCurrentPassword,
-        confirmPassword, setConfirmPassword,
-        loading, strength,
-        errorMsg,
-        showPassword, setShowPassword,
-        showConfirmPassword, setShowConfirmPassword,
-        showCurrentPassword, setShowCurrentPassword,
-        checkStrength, handleUpdate,
-        router
-    };
+      setTimeout(async () => {
+        await supabase.auth.signOut();
+        router.push("/login");
+      }, 2000);
+    } catch (error: any) {
+      setErrorMsg(error.message);
+      setLoading(false);
+    }
+  };
+
+  return {
+    password,
+    setPassword,
+    currentPassword,
+    setCurrentPassword,
+    confirmPassword,
+    setConfirmPassword,
+    loading,
+    strength,
+    errorMsg,
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
+    showCurrentPassword,
+    setShowCurrentPassword,
+    checkStrength,
+    handleUpdate,
+    router,
+  };
 }
