@@ -48,7 +48,8 @@ export default function ProfileEditForm() {
   }
 
   return (
-    <div className="bg-grey-100 p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100 mx-auto">
+    /* Increased max-w to 4xl to accommodate the two-column grid */
+    <div className="bg-gray-100 p-8 rounded-3xl shadow-xl w-full max-w-4xl border border-gray-100 mx-auto">
       
     {/*HIDDEN INPUT FIELD */}
       <input 
@@ -89,81 +90,83 @@ export default function ProfileEditForm() {
         <p className="text-sm text-gray-400">View and edit your current profile information</p>
       </div>
 
-      <div className="space-y-6">
+      {/* --- GRID SYSTEM: INFO ON LEFT (8 cols), BUTTONS ON RIGHT (4 cols) --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        {/* First Name  Row */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">First Name</label>
-          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
-            <span className="truncate">{profile.firstName}</span>
-            <button onClick={() => openEditModal("firstName", "First Name", profile.firstName)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} className="text-[#1e293b]" />
-            </button>
+        {/* LEFT COLUMN: Profile Info */}
+        <div className="lg:col-span-8 space-y-6">
+
+          {/* First Name  Row */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">First Name</label>
+            <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
+              <span className="truncate">{profile.firstName}</span>
+              <button onClick={() => openEditModal("firstName", "First Name", profile.firstName)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                  <Pencil size={14} className="text-[#1e293b]" />
+              </button>
+            </div>
           </div>
+
+          {/* Surname Row */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Surname</label>
+            <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
+              <span className="truncate">{profile.surname}</span>
+              <button onClick={() => openEditModal("surname", "Surname", profile.surname)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                  <Pencil size={14} className="text-[#1e293b]"/>
+              </button>
+            </div>
+          </div>
+
+          {/* Username Row */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Username</label>
+            <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
+              <span className="truncate">{profile.username}</span>
+              <button onClick={() => openEditModal("username", "Username", profile.username)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
+                  <Pencil size={14} className="text-[#1e293b]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Email Row */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 flex items-center gap-1">
+              Email Address <ShieldCheck size={12} className="text-[#c5a059]" />
+            </label>
+            <div className="flex items-center gap-3 h-12 p-3 bg-gray-100 rounded-xl border border-gray-200 text-gray-400 italic">
+              <Mail size={18} className="shrink-0" />
+              <span className="truncate">{profile.email}</span>
+            </div>
+          </div>
+
         </div>
 
-        {/* Surname Row */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Surname</label>
-          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
-            <span className="truncate">{profile.surname}</span>
-            <button onClick={() => openEditModal("surname", "Surname", profile.surname)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} className="text-[#1e293b]"/>
-            </button>
-          </div>
-        </div>
-
-        {/* Username Row */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Username</label>
-          <div className="flex items-center justify-between gap-3 h-12 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700 font-medium">
-            <span className="truncate">{profile.username}</span>
-            <button onClick={() => openEditModal("username", "Username", profile.username)} className="text-blue-500 hover:text-blue-700 transition-colors shrink-0 ml-2">
-                <Pencil size={14} className="text-[#1e293b]" />
-            </button>
-          </div>
-        </div>
-
-        {/* Email Row */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 flex items-center gap-1">
-            Email Address <ShieldCheck size={12} className="text-[#c5a059]" />
-          </label>
-          <div className="flex items-center gap-3 h-12 p-3 bg-gray-100 rounded-xl border border-gray-200 text-gray-400 italic">
-            <Mail size={18} className="shrink-0" />
-            <span className="truncate">{profile.email}</span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="pt-6 space-y-3">
+        {/* RIGHT COLUMN: Sidebar Action Buttons */}
+        <div className="lg:col-span-4 pt-0 space-y-3 flex flex-col justify-center">
           
-          {/* Top Row: Reset & Delete side-by-side */}
-          <div className="flex gap-3">
+          {/* Reset Password Buttons */}
+          <button 
+            type="button"
+            onClick={() => router.push("/dashboard/profile/reset-password")}
+            className="w-full flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
+          >
+            <Lock size={16} />
+            Reset Password
+          </button>
 
-            {/* Reset Password Buttons */}
-            <button 
-              type="button"
-              onClick={() => router.push("/dashboard/profile/reset-password")}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
-            >
-              <Lock size={16} />
-              Reset Password
-            </button>
-
-            {/* Delete Account */}
-            <button 
-              type="button"
-              onClick={() => {
-                setIsDeleteModalOpen(true);
-                setDeleteStep("confirm"); // Start at the confirmation question
-              }}
-              className="flex-1 flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
-            >
-              <X size={16} />
-              Delete Account
-            </button>
-          </div>
+          {/* Delete Account */}
+          <button 
+            type="button"
+            onClick={() => {
+              setIsDeleteModalOpen(true);
+              setDeleteStep("confirm"); // Start at the confirmation question
+            }}
+            className="w-full flex items-center justify-center gap-2 h-12 bg-[#1e293b] rounded-xl text-white font-semibold hover:bg-[#c5a059] transition-all shadow-lg shadow-blue-100"
+          >
+            <X size={16} />
+            Delete Account
+          </button>
 
           {/* Bottom Row: Back to Dashboard */}
           <button 
@@ -319,7 +322,6 @@ export default function ProfileEditForm() {
         </div>
       )}
 
-    </div> // This closes the main white card
+    </div>
   );
 }
-  
