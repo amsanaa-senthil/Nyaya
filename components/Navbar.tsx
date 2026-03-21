@@ -68,7 +68,7 @@ export default function Navbar() {
 
           {/* Link to the User Profile/Account settings */}
           <NavLink 
-            href="/dashboard/profile" 
+            href="/dashboard/profile-display" 
             icon={<User size={18} />} 
             label="Profile" 
             active={pathname.includes("/profile")} 
