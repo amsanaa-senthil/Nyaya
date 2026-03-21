@@ -3,14 +3,14 @@
 import os
 
 from dotenv import load_dotenv
-from google import genai
+import google.generativeai as genai
 
 
 def run_manual_model_list() -> None:
     load_dotenv()
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    for model in client.models.list():
-        print(model.name)
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    for model in genai.list_models():
+        print(getattr(model, "name", "unknown"))
 
 
 def test_models_smoke_placeholder():

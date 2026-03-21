@@ -3,7 +3,6 @@ import json
 from pipeline.extract_pdf import extract_pages_from_pdf
 from pipeline.chunk_pdf import chunk_pages_with_metadata
 from pipeline.chunker import logical_chunking
-from pipeline.embedder import embed_chunks
 from pipeline.store_vectors import store_in_qdrant
 from graph.neo4j_loader import create_case_node, create_citation_relationships
 from graph.consolidate_graph import consolidate_duplicate_cases
@@ -160,6 +159,9 @@ def _pages_to_text(pages):
 
 
 def _process_pdf(pdf_info, index_state, deferred_queue, force_retry=False):
+    # Import lazily to avoid loading embedding model during unrelated test collection.
+    from pipeline.embedder import embed_chunks
+
     pdf_path = pdf_info["pdf_path"]
     display_name = pdf_info["display_name"]
     relative_path = pdf_info["relative_path"]
