@@ -3,13 +3,28 @@
 import os
 
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 
 def run_manual_model_list() -> None:
     load_dotenv()
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    for model in genai.list_models():
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    try:
+        # Preferred SDK (google-genai)
+        from google import genai  # type: ignore
+
+        client = genai.Client(api_key=api_key)
+        for model in client.models.list():
+            print(getattr(model, "name", "unknown"))
+        return
+    except Exception:
+        pass
+
+    # Backward-compatible fallback for older environments.
+    import google.generativeai as legacy_genai  # type: ignore
+
+    legacy_genai.configure(api_key=api_key)
+    for model in legacy_genai.list_models():
         print(getattr(model, "name", "unknown"))
 
 
