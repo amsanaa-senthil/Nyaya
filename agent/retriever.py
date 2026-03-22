@@ -74,6 +74,24 @@ def _is_sc_doc(payload_or_doc: dict | None) -> bool:
     return _is_sc_pdf(pdf_name) or _is_sc_pdf(source_filename)
 
 
+def _safe_page(page_value) -> int:
+    try:
+        return int(page_value)
+    except Exception:
+        return 10**9
+
+
+def _stable_doc_signature(doc: dict | None) -> tuple:
+    if not isinstance(doc, dict):
+        return ("", "", 10**9, "", "")
+    pdf_name = str(doc.get("pdf_name") or "")
+    source_path = str(doc.get("source_path") or "")
+    page = _safe_page(doc.get("page"))
+    section = str(doc.get("section") or "")
+    text_prefix = str(doc.get("text") or "")[:120]
+    return (pdf_name, source_path, page, section, text_prefix)
+
+
 def _enrich_points(points, return_metadata=True):
     """
     Helper: Convert Qdrant points to enriched result format.
@@ -375,11 +393,13 @@ class HybridRetriever:
                             "final_score": normalized_bm25 * bm25_weight + recency * recency_weight
                         }
         
-        # Sort by final score and return top_k
+        # Sort by final score with deterministic tie-breakers.
         sorted_results = sorted(
             combined_results.values(),
-            key=lambda x: x["final_score"],
-            reverse=True
+            key=lambda x: (
+                -float(x.get("final_score", 0.0)),
+                *_stable_doc_signature(x.get("doc") if isinstance(x, dict) else None),
+            )
         )
 
         # Optional cross-encoder re-ranking over top candidates
@@ -412,6 +432,15 @@ class HybridRetriever:
             text_key = (doc.get("text", "") if isinstance(doc, dict) else "")[:500]
             if text_key in filtered_by_text:
                 filtered_by_text[text_key]["retrieval_score"] = round(float(item.get("final_score", 0.0)), 4)
+
+        # Ensure stable output ordering for identical queries.
+        filtered_results = sorted(
+            filtered_results,
+            key=lambda doc: (
+                -float((doc or {}).get("retrieval_score", 0.0)) if isinstance(doc, dict) else 0.0,
+                *_stable_doc_signature(doc if isinstance(doc, dict) else None),
+            )
+        )[:top_k]
         
         # Cache results for future queries
         if OPTIMIZED_SETTINGS.get("cache_enabled"):
